@@ -49,6 +49,7 @@ function construirURLMapa(lat, lon, estilo) {
   return constructor(zoom, x, y);
 }
 
+const MAPA_ALINEACION = { izquierda: "flex-start", centro: "center", derecha: "flex-end" };
 const MAPA_FUENTES = {
   georgia: "'Georgia', serif",
   clasica: "'Times New Roman', serif",
@@ -92,6 +93,7 @@ function pintar() {
         const img = document.createElement("img");
         img.src = el.src;
         img.alt = "";
+        img.style.objectPosition = `${el.posX ?? 50}% ${el.posY ?? 50}%`;
         div.appendChild(img);
       }
     } else if (el.tipo === "mapa") {
@@ -118,6 +120,8 @@ function pintar() {
     } else {
       div.style.fontSize = el.fontSize + "cqw";
       div.style.fontFamily = MAPA_FUENTES[el.fuente || "georgia"];
+      div.style.textAlign = el.alineacion === "izquierda" ? "left" : el.alineacion === "derecha" ? "right" : "center";
+      div.style.justifyContent = MAPA_ALINEACION[el.alineacion || "centro"];
       div.textContent = el.texto;
     }
 

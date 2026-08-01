@@ -832,7 +832,7 @@ body {
   pointer-events: none;
 }
 
-.grip, .handle-resize, .handle-borrar, .handle-formato, .handle-duplicar {
+.grip, .handle-resize, .handle-borrar, .handle-formato, .handle-duplicar, .handle-encuadre {
   position: absolute;
   width: 24px;
   height: 24px;
@@ -851,7 +851,7 @@ body {
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
-.grip:hover, .handle-resize:hover, .handle-borrar:hover, .handle-formato:hover, .handle-duplicar:hover {
+.grip:hover, .handle-resize:hover, .handle-borrar:hover, .handle-formato:hover, .handle-duplicar:hover, .handle-encuadre:hover {
   opacity: 1;
   transform: scale(1.12);
 }
@@ -1006,6 +1006,106 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* --- BOTONES DE ALINEACIÓN (más anchos que un ícono redondo) --- */
+#btnAlinearIzq, #btnAlinearCentro, #btnAlinearDer {
+  width: auto;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78em;
+  font-weight: 600;
+}
+#btnAlinearIzq.activo, #btnAlinearCentro.activo, #btnAlinearDer.activo {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* --- ENCUADRE DE FOTO (popover) --- */
+.popover-encuadre {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 12px 14px;
+  z-index: 10;
+  width: 200px;
+  touch-action: auto;
+}
+
+.popover-encuadre label {
+  display: block;
+  font-size: 0.75em;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+
+.popover-encuadre input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.handle-encuadre {
+  bottom: -12px;
+  left: 44px;
+  background: #3b7ddd;
+}
+
+/* --- TAMAÑO DE LA INTERFAZ (densidad) --- */
+.app.densidad-compacta .rail { width: 60px; }
+.app.densidad-compacta .rail-icono { font-size: 1.05em; }
+.app.densidad-compacta .rail-etiqueta { font-size: 0.6em; }
+.app.densidad-compacta .topbar { padding: 6px 14px; }
+.app.densidad-compacta .panel-lateral { width: 260px; }
+.app.densidad-compacta .icono-topbar { width: 30px; height: 30px; font-size: 1em; }
+
+.app.densidad-grande .rail { width: 108px; }
+.app.densidad-grande .rail-icono { font-size: 1.7em; }
+.app.densidad-grande .rail-etiqueta { font-size: 0.8em; }
+.app.densidad-grande .topbar { padding: 16px 26px; }
+.app.densidad-grande .panel-lateral { width: 340px; }
+.app.densidad-grande .icono-topbar { width: 42px; height: 42px; font-size: 1.35em; }
+.app.densidad-grande .boton { padding: 11px 20px; font-size: 1em; }
+
+/* --- DISEÑOS PERSONALIZADOS --- */
+.fila-diseno-personalizado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.fila-diseno-personalizado .caja-mini {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.fila-diseno-personalizado .nombre-diseno {
+  flex: 1;
+  font-size: 0.86em;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boton-estrella {
+  border: none;
+  background: transparent;
+  font-size: 1.1em;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.boton-estrella.activa {
+  color: var(--accent-strong);
 }
 
 /* --- RESPONSIVE --- */

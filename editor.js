@@ -288,11 +288,12 @@ function crearElementoDOM(el, idx, hojaObj) {
       const img = document.createElement("img");
       img.src = el.src;
       img.draggable = false;
+      img.style.objectPosition = `${el.posX ?? 50}% ${el.posY ?? 50}%`;
       wrapper.appendChild(img);
     }
     wrapper.addEventListener("pointerdown", (e) => {
       if (el.vacio) return;
-      if (e.target.closest(".handle-resize, .handle-borrar, .handle-duplicar")) return;
+      if (e.target.closest(".handle-resize, .handle-borrar, .handle-duplicar, .handle-encuadre, .popover-encuadre")) return;
       iniciarArrastre(e, el, wrapper);
     });
   } else if (el.tipo === "mapa") {
@@ -333,6 +334,8 @@ function crearElementoDOM(el, idx, hojaObj) {
     contenido.spellcheck = false;
     contenido.style.fontSize = el.fontSize + "cqw";
     contenido.style.fontFamily = MAPA_FUENTES[el.fuente || "georgia"];
+    contenido.style.justifyContent = MAPA_ALINEACION[el.alineacion || "centro"];
+    contenido.style.textAlign = el.alineacion === "izquierda" ? "left" : el.alineacion === "derecha" ? "right" : "center";
     contenido.textContent = el.texto;
     contenido.addEventListener("pointerdown", (e) => e.stopPropagation());
     contenido.addEventListener("focus", () => mostrarBarraFormato(el));
@@ -384,6 +387,18 @@ function crearElementoDOM(el, idx, hojaObj) {
       render();
     });
     wrapper.appendChild(handleDuplicar);
+  }
+
+  if (el.tipo === "foto" && !el.vacio) {
+    const handleEncuadre = document.createElement("span");
+    handleEncuadre.className = "handle-encuadre";
+    handleEncuadre.textContent = "🎯";
+    handleEncuadre.title = "Ajustar encuadre";
+    handleEncuadre.addEventListener("click", (e) => {
+      e.stopPropagation();
+      abrirPopoverEncuadre(el, wrapper);
+    });
+    wrapper.appendChild(handleEncuadre);
   }
 
   if (el.tipo === "mapa" || el.tipo === "bandera") {
@@ -466,6 +481,53 @@ function clamp(valor, min, max) {
   return Math.max(min, Math.min(max, valor));
 }
 
+/* ---------- ENCUADRE DE FOTO (elegir qué parte de la foto se ve) ---------- */
+function cerrarPopoversEncuadre() {
+  document.querySelectorAll(".popover-encuadre").forEach((p) => p.remove());
+}
+
+function abrirPopoverEncuadre(el, wrapper) {
+  const yaAbierto = wrapper.querySelector(".popover-encuadre");
+  cerrarPopoversEncuadre();
+  if (yaAbierto) return;
+
+  const pop = document.createElement("div");
+  pop.className = "popover-encuadre";
+
+  const filaX = document.createElement("label");
+  filaX.textContent = "Horizontal";
+  const rangoX = document.createElement("input");
+  rangoX.type = "range"; rangoX.min = 0; rangoX.max = 100; rangoX.value = el.posX ?? 50;
+  filaX.appendChild(rangoX);
+
+  const filaY = document.createElement("label");
+  filaY.textContent = "Vertical";
+  const rangoY = document.createElement("input");
+  rangoY.type = "range"; rangoY.min = 0; rangoY.max = 100; rangoY.value = el.posY ?? 50;
+  filaY.appendChild(rangoY);
+
+  pop.appendChild(filaX);
+  pop.appendChild(filaY);
+  wrapper.appendChild(pop);
+
+  function actualizar() {
+    el.posX = Number(rangoX.value);
+    el.posY = Number(rangoY.value);
+    const img = wrapper.querySelector("img");
+    if (img) img.style.objectPosition = `${el.posX}% ${el.posY}%`;
+  }
+  rangoX.addEventListener("input", actualizar);
+  rangoY.addEventListener("input", actualizar);
+  rangoX.addEventListener("change", guardarEstado);
+  rangoY.addEventListener("change", guardarEstado);
+
+  pop.addEventListener("pointerdown", (e) => e.stopPropagation());
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".popover-encuadre, .handle-encuadre")) cerrarPopoversEncuadre();
+});
+
 /* ==========================================================
    FORMATO DE TEXTO (tipografía y tamaño)
    ========================================================== */
@@ -485,6 +547,7 @@ const OPCIONES_FUENTE = [
   { id: "titular", etiqueta: "Título (Playfair)" },
   { id: "manuscrita", etiqueta: "Manuscrita (Caveat)" }
 ];
+const MAPA_ALINEACION = { izquierda: "flex-start", centro: "center", derecha: "flex-end" };
 
 const barraFormato = document.getElementById("barraFormato");
 const selectFuente = document.getElementById("selectFuente");
@@ -498,12 +561,31 @@ OPCIONES_FUENTE.forEach((f) => {
 
 let elementoTextoActivo = null;
 
+const botonesAlineacion = {
+  izquierda: document.getElementById("btnAlinearIzq"),
+  centro: document.getElementById("btnAlinearCentro"),
+  derecha: document.getElementById("btnAlinearDer")
+};
+
 function mostrarBarraFormato(el) {
   elementoTextoActivo = el;
   selectFuente.value = el.fuente || "georgia";
   indicadorTamano.textContent = (el.fontSize || 5).toFixed(1).replace(/\.0$/, "");
+  Object.entries(botonesAlineacion).forEach(([nombre, btn]) => {
+    btn.classList.toggle("activo", (el.alineacion || "centro") === nombre);
+  });
   barraFormato.classList.remove("oculto");
 }
+
+function cambiarAlineacion(valor) {
+  if (!elementoTextoActivo) return;
+  elementoTextoActivo.alineacion = valor;
+  guardarEstado();
+  render();
+}
+botonesAlineacion.izquierda.addEventListener("click", () => cambiarAlineacion("izquierda"));
+botonesAlineacion.centro.addEventListener("click", () => cambiarAlineacion("centro"));
+botonesAlineacion.derecha.addEventListener("click", () => cambiarAlineacion("derecha"));
 
 function ocultarBarraFormatoSiCorresponde() {
   const hojaObj = hojaEnPosicion(posicion);
@@ -917,25 +999,66 @@ const DISENOS = [
   { id: "lateral", celdas: [{ x: 2, y: 2, w: 63, h: 96 }, { x: 67, y: 2, w: 31, h: 31 }, { x: 67, y: 35, w: 31, h: 31 }, { x: 67, y: 68, w: 31, h: 30 }] }
 ];
 
+/* ---------- DISEÑOS PERSONALIZADOS (guardar el acomodo de fotos como plantilla propia) ---------- */
+const CLAVE_DISENOS_PERSONALIZADOS = "libroFotosDisenosPersonalizados_v1";
+
+function cargarDisenosPersonalizados() {
+  try {
+    const crudo = localStorage.getItem(CLAVE_DISENOS_PERSONALIZADOS);
+    if (crudo) {
+      const d = JSON.parse(crudo);
+      if (Array.isArray(d.presets)) return d;
+    }
+  } catch (e) { /* datos corruptos: empezamos de nuevo */ }
+  return { presets: [], defaultId: null };
+}
+function guardarDisenosPersonalizados(d) {
+  localStorage.setItem(CLAVE_DISENOS_PERSONALIZADOS, JSON.stringify(d));
+}
+
+function hojaNuevaConPredeterminado() {
+  const d = cargarDisenosPersonalizados();
+  const preset = d.presets.find((p) => p.id === d.defaultId);
+  if (!preset) return hojaVacia();
+  return {
+    fondo: { tipo: "color", valor: "#fffdf8" },
+    elementos: preset.celdas.map((c) => ({ tipo: "foto", vacio: true, x: c.x, y: c.y, w: c.w, h: c.h }))
+  };
+}
+
+function construirCajaMini(celdas) {
+  const caja = document.createElement("div");
+  caja.className = "caja-mini";
+  celdas.forEach((c) => {
+    const r = document.createElement("span");
+    r.style.left = c.x + "%";
+    r.style.top = c.y + "%";
+    r.style.width = c.w + "%";
+    r.style.height = c.h + "%";
+    caja.appendChild(r);
+  });
+  return caja;
+}
+
 function construirPanelDisenosUI() {
   panelLateralContenido.innerHTML = "";
+
+  const btnGuardar = document.createElement("button");
+  btnGuardar.className = "boton";
+  btnGuardar.style.width = "100%";
+  btnGuardar.style.justifyContent = "center";
+  btnGuardar.style.marginBottom = "14px";
+  btnGuardar.textContent = "💾 Guardar el diseño de esta página";
+  btnGuardar.addEventListener("click", guardarDisenoActualComoPersonalizado);
+  panelLateralContenido.appendChild(btnGuardar);
+
   const rejilla = document.createElement("div");
   rejilla.className = "rejilla-disenos";
   DISENOS.forEach((d) => {
     const boton = document.createElement("button");
     boton.className = "miniatura-diseno";
     boton.title = "Aplicar este diseño a la página actual";
-    const caja = document.createElement("div");
-    caja.className = "caja-mini";
-    d.celdas.forEach((c) => {
-      const r = document.createElement("span");
-      r.style.left = c.x + "%";
-      r.style.top = c.y + "%";
-      r.style.width = c.w + "%";
-      r.style.height = c.h + "%";
-      caja.appendChild(r);
-    });
-    boton.appendChild(caja);
+    boton.appendChild(construirCajaMini(d.celdas));
     boton.addEventListener("click", () => {
       aplicarDiseno(d);
       cerrarPanel();
@@ -943,6 +1066,101 @@ function construirPanelDisenosUI() {
     rejilla.appendChild(boton);
   });
   panelLateralContenido.appendChild(rejilla);
+
+  const datosPersonalizados = cargarDisenosPersonalizados();
+  if (datosPersonalizados.presets.length) {
+    const separador = document.createElement("div");
+    separador.className = "separador-panel";
+    panelLateralContenido.appendChild(separador);
+
+    const subtitulo = document.createElement("p");
+    subtitulo.className = "panel-vacio";
+    subtitulo.style.textAlign = "left";
+    subtitulo.style.margin = "0 0 10px";
+    subtitulo.textContent = "Tus diseños — la ⭐ se usa automáticamente en las páginas nuevas.";
+    panelLateralContenido.appendChild(subtitulo);
+
+    datosPersonalizados.presets.forEach((preset) => {
+      const fila = document.createElement("div");
+      fila.className = "fila-diseno-personalizado";
+
+      const miniBoton = document.createElement("button");
+      miniBoton.className = "miniatura-diseno";
+      miniBoton.title = "Aplicar este diseño a la página actual";
+      miniBoton.appendChild(construirCajaMini(preset.celdas));
+      miniBoton.addEventListener("click", () => {
+        aplicarDiseno(preset);
+        cerrarPanel();
+      });
+      fila.appendChild(miniBoton);
+
+      const nombre = document.createElement("span");
+      nombre.className = "nombre-diseno";
+      nombre.textContent = preset.nombre;
+      fila.appendChild(nombre);
+
+      const btnEstrella = document.createElement("button");
+      btnEstrella.className = "boton-estrella" + (datosPersonalizados.defaultId === preset.id ? " activa" : "");
+      btnEstrella.title = "Usar como diseño predeterminado para páginas nuevas";
+      btnEstrella.textContent = datosPersonalizados.defaultId === preset.id ? "⭐" : "☆";
+      btnEstrella.addEventListener("click", () => {
+        const d2 = cargarDisenosPersonalizados();
+        d2.defaultId = d2.defaultId === preset.id ? null : preset.id;
+        guardarDisenosPersonalizados(d2);
+        construirPanelDisenosUI();
+      });
+      fila.appendChild(btnEstrella);
+
+      const btnBorrar = document.createElement("button");
+      btnBorrar.className = "boton-estrella";
+      btnBorrar.title = "Eliminar este diseño";
+      btnBorrar.textContent = "🗑";
+      btnBorrar.addEventListener("click", async () => {
+        const ok = await abrirModal({
+          titulo: "Eliminar diseño",
+          mensaje: `¿Eliminar el diseño "${preset.nombre}"? Esto no borra las fotos que ya usaste, solo la plantilla.`,
+          textoOk: "Eliminar",
+          peligro: true
+        });
+        if (!ok) return;
+        const d3 = cargarDisenosPersonalizados();
+        d3.presets = d3.presets.filter((p) => p.id !== preset.id);
+        if (d3.defaultId === preset.id) d3.defaultId = null;
+        guardarDisenosPersonalizados(d3);
+        construirPanelDisenosUI();
+      });
+      fila.appendChild(btnBorrar);
+
+      panelLateralContenido.appendChild(fila);
+    });
+  }
+}
+
+async function guardarDisenoActualComoPersonalizado() {
+  const hojaObj = hojaEnPosicion(posicion);
+  const fotos = hojaObj.elementos.filter((e) => e.tipo === "foto");
+  if (!fotos.length) {
+    await abrirModal({
+      titulo: "Sin fotos en esta página",
+      mensaje: "Para guardar un diseño primero acomodá una o más fotos en la página actual.",
+      textoOk: "Entendido",
+      textoCancelar: "Cerrar"
+    });
+    return;
+  }
+  const nombre = await abrirModal({
+    titulo: "Guardar diseño",
+    mensaje: "Ponele un nombre a este acomodo de fotos para volver a usarlo cuando quieras.",
+    conInput: true,
+    valorInicial: "Mi diseño",
+    textoOk: "Guardar"
+  });
+  if (!nombre) return;
+  const celdas = fotos.map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.h }));
+  const d = cargarDisenosPersonalizados();
+  d.presets.push({ id: generarId(), nombre, celdas });
+  guardarDisenosPersonalizados(d);
+  construirPanelDisenosUI();
 }
 
 function aplicarDiseno(diseno) {
@@ -1268,7 +1486,7 @@ function moverPagina(desde, hacia) {
 }
 
 function insertarPaginaEnIndice(indice) {
-  estado.paginas.splice(indice, 0, hojaVacia());
+  estado.paginas.splice(indice, 0, hojaNuevaConPredeterminado());
   posicion = indice + 1;
   guardarEstado();
   if (panelActivo === "paginas") construirPanelPaginas();
@@ -1329,6 +1547,25 @@ document.getElementById("btnZoomReset").addEventListener("click", () => {
   nivelZoom = 100;
   aplicarZoom();
 });
+
+/* ---------- TAMAÑO DE LA INTERFAZ (barras más grandes o chicas) ---------- */
+const NIVELES_DENSIDAD = ["compacta", "normal", "grande"];
+const ETIQUETAS_DENSIDAD = { compacta: "🔎－", normal: "🔎", grande: "🔎＋" };
+let densidadActual = localStorage.getItem("libroFotosDensidadUI") || "normal";
+
+function aplicarDensidad() {
+  const app = document.querySelector(".app");
+  app.classList.remove("densidad-compacta", "densidad-grande");
+  if (densidadActual !== "normal") app.classList.add("densidad-" + densidadActual);
+  document.getElementById("btnDensidad").textContent = ETIQUETAS_DENSIDAD[densidadActual];
+  localStorage.setItem("libroFotosDensidadUI", densidadActual);
+}
+document.getElementById("btnDensidad").addEventListener("click", () => {
+  const i = NIVELES_DENSIDAD.indexOf(densidadActual);
+  densidadActual = NIVELES_DENSIDAD[(i + 1) % NIVELES_DENSIDAD.length];
+  aplicarDensidad();
+});
+aplicarDensidad();
 
 /* ---------- DESHACER / REHACER ---------- */
 document.getElementById("btnDeshacer").addEventListener("click", deshacer);
