@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Libro de Fotos</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="escenario">
+
+    <!-- TAPA (portada) -->
+    <section id="tapa" class="tapa">
+      <h1 id="tituloLibro">Nuestro Libro de Fotos</h1>
+      <p id="subtituloLibro">Un recuerdo para siempre</p>
+      <button id="btnAbrir" class="boton">Abrir libro</button>
+    </section>
+
+    <!-- LIBRO -->
+    <section id="libro" class="libro oculto">
+      <button id="btnPrev" class="flecha flecha-izq" aria-label="Página anterior">&#10094;</button>
+
+      <div class="hoja-contenedor">
+        <div class="hoja" id="hoja"></div>
+        <div class="contador" id="contador"></div>
+      </div>
+
+      <button id="btnNext" class="flecha flecha-der" aria-label="Página siguiente">&#10095;</button>
+    </section>
+
+  </div>
+
+<script>
+/* Estos son los datos de tu libro. Para editarlos NO toques este bloque a mano:
+   abrí editor.html, hacé tus cambios y descargá un index.html nuevo. */
+window.DATOS_LIBRO = {
+  "titulo": "Nuestro Libro de Fotos",
+  "subtitulo": "Un recuerdo para siempre",
+  "paginas": [
+    {
+      "elementos": [
+        { "tipo": "texto", "x": 10, "y": 35, "w": 80, "h": 30, "fontSize": 5,
+          "texto": "¡Bienvenido a tu libro! Abrí editor.html para agregar tus fotos y textos." }
+      ]
+    }
+  ]
+};
+</script>
+<script src="script.js"></script>
+</body>
+</html>

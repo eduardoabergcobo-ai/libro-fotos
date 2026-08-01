@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editor - Libro de Fotos</title>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+  <header class="cabecera">
+    <div class="titulos">
+      <h1 id="tituloEditable" contenteditable="true" spellcheck="false"></h1>
+      <p id="subtituloEditable" contenteditable="true" spellcheck="false"></p>
+    </div>
+  </header>
+
+  <div class="barra">
+    <button id="btnFoto" class="btn">📷 Agregar fotos</button>
+    <input type="file" id="inputFoto" accept="image/*" multiple hidden>
+
+    <button id="btnTexto" class="btn">🔤 Agregar cuadro de texto</button>
+
+    <span class="separador"></span>
+
+    <button id="btnPaginaPrev" class="btn btn-icono">◀</button>
+    <span id="indicadorPagina" class="indicador"></span>
+    <button id="btnPaginaNext" class="btn btn-icono">▶</button>
+
+    <button id="btnPaginaNueva" class="btn">＋ Página nueva</button>
+    <button id="btnPaginaBorrar" class="btn btn-peligro">🗑 Borrar página</button>
+
+    <span class="separador"></span>
+
+    <button id="btnVistaPrevia" class="btn">👁 Vista previa</button>
+    <button id="btnDescargar" class="btn btn-primario">⬇ Descargar para publicar</button>
+    <button id="btnVaciar" class="btn btn-peligro">🧹 Empezar de nuevo</button>
+  </div>
+
+  <p class="ayuda">
+    Arrastrá los elementos desde el ícono <strong>⠿</strong>, cambiá el tamaño desde la esquina inferior derecha,
+    y borralos con la <strong>×</strong>. Los cuadros de texto se editan haciendo clic adentro y escribiendo directo.
+    Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar para publicar"</strong>.
+  </p>
+
+  <div class="zona-hoja">
+    <div class="hoja-contenedor">
+      <div class="hoja" id="hoja"></div>
+    </div>
+  </div>
+
+<script src="editor.js"></script>
+</body>
+</html>
