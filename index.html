@@ -9,42 +9,43 @@
 <body>
 
   <div class="escenario">
-
-    <!-- TAPA (portada) -->
-    <section id="tapa" class="tapa">
-      <h1 id="tituloLibro">Nuestro Libro de Fotos</h1>
-      <p id="subtituloLibro">Un recuerdo para siempre</p>
-      <button id="btnAbrir" class="boton">Abrir libro</button>
-    </section>
-
-    <!-- LIBRO -->
-    <section id="libro" class="libro oculto">
-      <button id="btnPrev" class="flecha flecha-izq" aria-label="Página anterior">&#10094;</button>
-
+    <div class="libro">
+      <button id="btnPrev" class="flecha flecha-izq oculto" aria-label="Página anterior">&#10094;</button>
       <div class="hoja-contenedor">
         <div class="hoja" id="hoja"></div>
-        <div class="contador" id="contador"></div>
+        <button id="btnAbrir" class="boton boton-abrir">Abrir libro</button>
+        <div class="contador oculto" id="contador"></div>
       </div>
-
-      <button id="btnNext" class="flecha flecha-der" aria-label="Página siguiente">&#10095;</button>
-    </section>
-
+      <button id="btnNext" class="flecha flecha-der oculto" aria-label="Página siguiente">&#10095;</button>
+    </div>
   </div>
 
 <script>
 /* Estos son los datos de tu libro. Para editarlos NO toques este bloque a mano:
    abrí editor.html, hacé tus cambios y descargá un index.html nuevo. */
 window.DATOS_LIBRO = {
-  "titulo": "Nuestro Libro de Fotos",
-  "subtitulo": "Un recuerdo para siempre",
+  "tapa": {
+    "fondo": { "tipo": "color", "valor": "#2b1d14" },
+    "elementos": [
+      { "tipo": "titulo", "x": 10, "y": 30, "w": 80, "h": 18, "fontSize": 9, "texto": "Nuestro Libro de Fotos" },
+      { "tipo": "subtitulo", "x": 10, "y": 50, "w": 80, "h": 10, "fontSize": 4.2, "texto": "Un recuerdo para siempre" }
+    ]
+  },
   "paginas": [
     {
+      "fondo": { "tipo": "color", "valor": "#fffdf8" },
       "elementos": [
         { "tipo": "texto", "x": 10, "y": 35, "w": 80, "h": 30, "fontSize": 5,
           "texto": "¡Bienvenido a tu libro! Abrí editor.html para agregar tus fotos y textos." }
       ]
     }
-  ]
+  ],
+  "contratapa": {
+    "fondo": { "tipo": "color", "valor": "#2b1d14" },
+    "elementos": [
+      { "tipo": "texto", "x": 15, "y": 42, "w": 70, "h": 16, "fontSize": 4.5, "texto": "Gracias por mirar nuestro libro" }
+    ]
+  }
 };
 </script>
 <script src="script.js"></script>

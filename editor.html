@@ -9,10 +9,7 @@
 <body>
 
   <header class="cabecera">
-    <div class="titulos">
-      <h1 id="tituloEditable" contenteditable="true" spellcheck="false"></h1>
-      <p id="subtituloEditable" contenteditable="true" spellcheck="false"></p>
-    </div>
+    <h1>📖 Editor de tu Libro de Fotos</h1>
   </header>
 
   <div class="barra">
@@ -20,6 +17,8 @@
     <input type="file" id="inputFoto" accept="image/*" multiple hidden>
 
     <button id="btnTexto" class="btn">🔤 Agregar cuadro de texto</button>
+    <button id="btnDisenos" class="btn">▦ Diseños</button>
+    <button id="btnFondo" class="btn">🎨 Fondo</button>
 
     <span class="separador"></span>
 
@@ -37,9 +36,12 @@
     <button id="btnVaciar" class="btn btn-peligro">🧹 Empezar de nuevo</button>
   </div>
 
+  <div id="panelDisenos" class="panel oculto"></div>
+  <div id="panelFondo" class="panel oculto"></div>
+
   <p class="ayuda">
-    Arrastrá los elementos desde el ícono <strong>⠿</strong>, cambiá el tamaño desde la esquina inferior derecha,
-    y borralos con la <strong>×</strong>. Los cuadros de texto se editan haciendo clic adentro y escribiendo directo.
+    La <strong>tapa</strong> y la <strong>contratapa</strong> son páginas especiales: siempre son la primera y la última, y también les podés cambiar el fondo y agregar fotos o texto.
+    Arrastrá los elementos desde el ícono <strong>⠿</strong>, cambiá el tamaño desde la esquina inferior derecha, y borralos con la <strong>×</strong>.
     Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar para publicar"</strong>.
   </p>
 
@@ -47,6 +49,14 @@
     <div class="hoja-contenedor">
       <div class="hoja" id="hoja"></div>
     </div>
+  </div>
+
+  <div id="overlayPreview" class="overlay-preview oculto">
+    <div class="barra-preview">
+      <span>Vista previa de tu libro</span>
+      <button id="btnCerrarPreview" class="btn">✕ Cerrar</button>
+    </div>
+    <iframe id="iframePreview" class="iframe-preview" title="Vista previa del libro"></iframe>
   </div>
 
 <script src="editor.js"></script>
