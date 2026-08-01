@@ -32,6 +32,28 @@ function hojaEnPosicion(pos) {
   return datos.paginas[pos - 1];
 }
 
+const ESTILOS_MAPA = {
+  estandar: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  topografico: (z, x, y) => `https://a.tile.opentopomap.org/${z}/${x}/${y}.png`,
+  ciclismo: (z, x, y) => `https://a.tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${x}/${y}.png`,
+  humanitario: (z, x, y) => `https://tile-a.openstreetmap.fr/hot/${z}/${x}/${y}.png`
+};
+
+function construirURLMapa(lat, lon, estilo) {
+  const zoom = 14;
+  const n = Math.pow(2, zoom);
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+  const constructor = ESTILOS_MAPA[estilo] || ESTILOS_MAPA.estandar;
+  return constructor(zoom, x, y);
+}
+
+function codigoPaisABandera(codigoPais) {
+  if (!codigoPais || codigoPais.length !== 2) return "🏳️";
+  return String.fromCodePoint(...codigoPais.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
+}
+
 function aplicarFondo(elHoja, fondo) {
   if (fondo && fondo.tipo === "foto") {
     elHoja.style.backgroundImage = `url(${fondo.valor})`;
@@ -62,6 +84,27 @@ function pintar() {
         img.src = el.src;
         img.alt = "";
         div.appendChild(img);
+      }
+    } else if (el.tipo === "mapa") {
+      const img = document.createElement("img");
+      img.src = construirURLMapa(el.lat, el.lon, el.estilo);
+      img.alt = "Mapa de ubicación";
+      div.appendChild(img);
+      const pin = document.createElement("span");
+      pin.className = "pin-mapa";
+      pin.textContent = "📍";
+      div.appendChild(pin);
+    } else if (el.tipo === "bandera") {
+      if (el.formato === "imagen") {
+        const img = document.createElement("img");
+        img.src = `https://flagcdn.com/w320/${el.codigoPais.toLowerCase()}.png`;
+        img.alt = "Bandera";
+        div.appendChild(img);
+      } else {
+        const span = document.createElement("span");
+        span.className = "emoji-bandera";
+        span.textContent = codigoPaisABandera(el.codigoPais);
+        div.appendChild(span);
       }
     } else {
       div.style.fontSize = el.fontSize + "cqw";

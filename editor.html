@@ -9,40 +9,71 @@
 <body>
 
   <header class="cabecera">
-    <h1>📖 Editor de tu Libro de Fotos</h1>
+    <div class="marca">
+      <span class="marca-icono">📖</span>
+      <span class="marca-texto">Editor de tu Libro de Fotos</span>
+    </div>
+    <div class="info-proyecto-activo">
+      <span id="nombreProyectoActivo" class="nombre-proyecto"></span>
+      <button id="btnProyectos" class="btn btn-header">📁 Mis proyectos</button>
+      <span id="indicadorGuardado" class="indicador-guardado"></span>
+    </div>
   </header>
 
   <div class="barra">
-    <button id="btnFoto" class="btn">📷 Agregar fotos</button>
-    <input type="file" id="inputFoto" accept="image/*" multiple hidden>
+    <div class="grupo-barra">
+      <span class="etiqueta-grupo">Contenido</span>
+      <div class="botones-grupo">
+        <button id="btnFoto" class="btn">📷 Fotos</button>
+        <button id="btnTexto" class="btn">🔤 Texto</button>
+      </div>
+    </div>
 
-    <button id="btnTexto" class="btn">🔤 Agregar cuadro de texto</button>
-    <button id="btnDisenos" class="btn">▦ Diseños</button>
-    <button id="btnFondo" class="btn">🎨 Fondo</button>
+    <div class="grupo-barra">
+      <span class="etiqueta-grupo">Diseño</span>
+      <div class="botones-grupo">
+        <button id="btnDisenos" class="btn">▦ Diseños</button>
+        <button id="btnFondo" class="btn">🎨 Fondo</button>
+      </div>
+    </div>
 
-    <span class="separador"></span>
+    <div class="grupo-barra">
+      <span class="etiqueta-grupo">Navegar</span>
+      <div class="botones-grupo botones-navegar">
+        <button id="btnPaginaPrev" class="btn btn-icono">◀</button>
+        <span id="indicadorPagina" class="indicador"></span>
+        <button id="btnPaginaNext" class="btn btn-icono">▶</button>
+      </div>
+    </div>
 
-    <button id="btnPaginaPrev" class="btn btn-icono">◀</button>
-    <span id="indicadorPagina" class="indicador"></span>
-    <button id="btnPaginaNext" class="btn btn-icono">▶</button>
+    <div class="grupo-barra">
+      <span class="etiqueta-grupo">Páginas</span>
+      <div class="botones-grupo">
+        <button id="btnPaginaNueva" class="btn">＋ Nueva</button>
+        <button id="btnReordenar" class="btn">📑 Reordenar</button>
+        <button id="btnPaginaBorrar" class="btn btn-peligro">🗑 Borrar</button>
+      </div>
+    </div>
 
-    <button id="btnPaginaNueva" class="btn">＋ Página nueva</button>
-    <button id="btnPaginaBorrar" class="btn btn-peligro">🗑 Borrar página</button>
-
-    <span class="separador"></span>
-
-    <button id="btnVistaPrevia" class="btn">👁 Vista previa</button>
-    <button id="btnDescargar" class="btn btn-primario">⬇ Descargar para publicar</button>
-    <button id="btnVaciar" class="btn btn-peligro">🧹 Empezar de nuevo</button>
+    <div class="grupo-barra grupo-final">
+      <span class="etiqueta-grupo">Libro</span>
+      <div class="botones-grupo">
+        <button id="btnVistaPrevia" class="btn">👁 Vista previa</button>
+        <button id="btnDescargar" class="btn btn-primario">⬇ Descargar</button>
+        <button id="btnVaciar" class="btn btn-peligro">🧹 Reiniciar</button>
+      </div>
+    </div>
   </div>
 
   <div id="panelDisenos" class="panel oculto"></div>
   <div id="panelFondo" class="panel oculto"></div>
+  <div id="panelPaginas" class="panel oculto"></div>
+  <div id="panelProyectos" class="panel oculto"></div>
 
   <p class="ayuda">
-    La <strong>tapa</strong> y la <strong>contratapa</strong> son páginas especiales: siempre son la primera y la última, y también les podés cambiar el fondo y agregar fotos o texto.
-    Arrastrá los elementos desde el ícono <strong>⠿</strong>, cambiá el tamaño desde la esquina inferior derecha, y borralos con la <strong>×</strong>.
-    Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar para publicar"</strong>.
+    La <strong>tapa</strong> y la <strong>contratapa</strong> son especiales: siempre son la primera y la última página, y también tienen fondo y elementos propios.
+    Arrastrá cada elemento desde <strong>⠿</strong>, cambiá su tamaño desde <strong>⤡</strong>, y borralo con <strong>×</strong>.
+    Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar"</strong>.
   </p>
 
   <div class="zona-hoja">
@@ -53,11 +84,27 @@
 
   <div id="overlayPreview" class="overlay-preview oculto">
     <div class="barra-preview">
-      <span>Vista previa de tu libro</span>
+      <span>👁 Vista previa de tu libro</span>
       <button id="btnCerrarPreview" class="btn">✕ Cerrar</button>
     </div>
     <iframe id="iframePreview" class="iframe-preview" title="Vista previa del libro"></iframe>
   </div>
+
+  <div id="modalOverlay" class="modal-overlay oculto">
+    <div class="modal-tarjeta">
+      <h3 id="modalTitulo"></h3>
+      <p id="modalMensaje"></p>
+      <input id="modalInput" class="modal-input oculto" type="text" spellcheck="false">
+      <div id="modalCasillas" class="modal-casillas"></div>
+      <div class="modal-botones">
+        <button id="modalCancelar" class="btn"></button>
+        <button id="modalOk" class="btn btn-primario"></button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="inputFoto" accept="image/*" multiple hidden>
+  <input type="file" id="inputAuxiliar" accept="image/*" hidden>
 
 <script src="editor.js"></script>
 </body>
