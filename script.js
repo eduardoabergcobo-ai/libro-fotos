@@ -12,6 +12,9 @@ let posicion = 0;
 let abierto = false;
 
 const hoja = document.getElementById("hoja");
+if (datos.configuracion) {
+  hoja.style.aspectRatio = `${datos.configuracion.anchoIn} / ${datos.configuracion.altoIn}`;
+}
 const contador = document.getElementById("contador");
 const btnPrev = document.getElementById("btnPrev");
 const btnNext = document.getElementById("btnNext");
@@ -58,6 +61,10 @@ const MAPA_FUENTES = {
   titular: "'Playfair Display', Georgia, serif",
   manuscrita: "'Caveat', cursive"
 };
+
+function construirURLQR(url) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+}
 
 function codigoPaisABandera(codigoPais) {
   if (!codigoPais || codigoPais.length !== 2) return "🏳️";
@@ -117,6 +124,11 @@ function pintar() {
         span.textContent = codigoPaisABandera(el.codigoPais);
         div.appendChild(span);
       }
+    } else if (el.tipo === "qr") {
+      const img = document.createElement("img");
+      img.src = construirURLQR(el.url);
+      img.alt = "Código QR";
+      div.appendChild(img);
     } else {
       div.style.fontSize = el.fontSize + "cqw";
       div.style.fontFamily = MAPA_FUENTES[el.fuente || "georgia"];

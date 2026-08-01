@@ -31,6 +31,7 @@
     <div class="topbar-grupo">
       <button id="btnDensidad" class="icono-topbar" title="Tamaño de la barra de herramientas">🔎</button>
       <button id="btnVistaPrevia" class="boton boton-fantasma">👁 Vista previa</button>
+      <button id="btnExportarImprimir" class="boton boton-fantasma">🖨️ Para imprimir</button>
       <button id="btnDescargar" class="boton boton-primario">⬇ Descargar</button>
     </div>
   </header>
@@ -51,6 +52,12 @@
       </button>
       <button class="rail-boton" data-panel="ubicacion" title="Mapa y bandera de un lugar">
         <span class="rail-icono">📍</span><span class="rail-etiqueta">Ubicación</span>
+      </button>
+      <button class="rail-boton" data-panel="qr" title="Código QR para video o link">
+        <span class="rail-icono">🔳</span><span class="rail-etiqueta">QR</span>
+      </button>
+      <button class="rail-boton" data-panel="tamano" title="Tamaño y orientación del libro">
+        <span class="rail-icono">📐</span><span class="rail-etiqueta">Tamaño</span>
       </button>
       <button class="rail-boton" data-panel="paginas" title="Tapa, contratapa y páginas">
         <span class="rail-icono">📑</span><span class="rail-etiqueta">Páginas</span>
@@ -113,6 +120,20 @@
       <button id="btnCerrarPreview" class="boton boton-fantasma-oscuro">✕ Cerrar</button>
     </div>
     <iframe id="iframePreview" class="iframe-preview" title="Vista previa del libro"></iframe>
+  </div>
+
+  <div id="overlayImprimir" class="overlay-preview oculto">
+    <div class="barra-preview">
+      <span>🖨️ Listo para imprimir</span>
+      <div class="topbar-grupo">
+        <button id="btnImprimirAhora" class="boton boton-primario">🖨️ Imprimir / Guardar como PDF</button>
+        <button id="btnCerrarImprimir" class="boton boton-fantasma-oscuro">✕ Cerrar</button>
+      </div>
+    </div>
+    <p class="ayuda-imprimir">
+      En la ventana de impresión de tu navegador, elegí <strong>"Guardar como PDF"</strong> como impresora, poné los márgenes en <strong>"Ninguno"</strong> y la escala en <strong>100%</strong>. Ese PDF ya queda listo para subir a Blurb, Shutterfly, Mixbook o la imprenta que prefieras.
+    </p>
+    <iframe id="iframeImprimir" class="iframe-preview" title="Vista para imprimir"></iframe>
   </div>
 
   <div id="modalOverlay" class="modal-overlay oculto">

@@ -20,6 +20,7 @@ function hojaVacia(fondo) {
 
 function estadoPorDefecto() {
   return {
+    configuracion: { anchoIn: 10, altoIn: 8 },
     tapa: {
       fondo: { tipo: "color", valor: "#2b1d14" },
       elementos: [elementoTitulo(), elementoSubtitulo()]
@@ -38,7 +39,10 @@ function estadoPorDefecto() {
 
 /* Convierte datos guardados con versiones viejas del editor */
 function migrarEstado(viejo) {
-  if (viejo && viejo.tapa && viejo.contratapa && Array.isArray(viejo.paginas)) return viejo;
+  if (viejo && viejo.tapa && viejo.contratapa && Array.isArray(viejo.paginas)) {
+    if (!viejo.configuracion) viejo.configuracion = { anchoIn: 10, altoIn: 8 };
+    return viejo;
+  }
   const nuevo = estadoPorDefecto();
   if (viejo && viejo.titulo) nuevo.tapa.elementos[0].texto = viejo.titulo;
   if (viejo && viejo.subtitulo) nuevo.tapa.elementos[1].texto = viejo.subtitulo;
@@ -223,8 +227,15 @@ const panelLateral = document.getElementById("panelLateral");
 const panelLateralTitulo = document.getElementById("panelLateralTitulo");
 const panelLateralContenido = document.getElementById("panelLateralContenido");
 
+/* ---------- TAMAÑO Y ORIENTACIÓN DEL LIBRO ---------- */
+function aplicarConfiguracionLibro() {
+  const conf = estado.configuracion || { anchoIn: 10, altoIn: 8 };
+  hoja.style.aspectRatio = `${conf.anchoIn} / ${conf.altoIn}`;
+}
+
 /* ---------- RENDER ---------- */
 function render() {
+  aplicarConfiguracionLibro();
   const hojaObj = hojaEnPosicion(posicion);
   aplicarFondo(hoja, hojaObj.fondo);
 
@@ -308,6 +319,16 @@ function crearElementoDOM(el, idx, hojaObj) {
     wrapper.appendChild(pin);
     wrapper.addEventListener("pointerdown", (e) => {
       if (e.target.closest(".handle-resize, .handle-borrar, .handle-formato, .handle-duplicar")) return;
+      iniciarArrastre(e, el, wrapper);
+    });
+  } else if (el.tipo === "qr") {
+    const img = document.createElement("img");
+    img.src = construirURLQR(el.url);
+    img.draggable = false;
+    img.alt = "Código QR";
+    wrapper.appendChild(img);
+    wrapper.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".handle-resize, .handle-borrar, .handle-duplicar")) return;
       iniciarArrastre(e, el, wrapper);
     });
   } else if (el.tipo === "bandera") {
@@ -781,6 +802,10 @@ function codigoPaisABandera(codigoPais) {
   return String.fromCodePoint(...codigoPais.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
 }
 
+function construirURLQR(url) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+}
+
 /* ---------- UBICACIÓN AUTOMÁTICA (GPS del EXIF de la foto) ---------- */
 function leerGPSDeArrayBuffer(buffer) {
   try {
@@ -974,6 +999,8 @@ const DEFINICIONES_PANEL = {
   disenos: { titulo: "Diseños con varias fotos", construir: construirPanelDisenosUI },
   fondo: { titulo: "Fondo de la página", construir: construirPanelFondo },
   ubicacion: { titulo: "Mapa y bandera de un lugar", construir: construirPanelUbicacion },
+  qr: { titulo: "Código QR (video o link)", construir: construirPanelQR },
+  tamano: { titulo: "Tamaño y orientación", construir: construirPanelTamano },
   paginas: { titulo: "Tapa, contratapa y páginas", construir: construirPanelPaginas }
 };
 
@@ -1375,6 +1402,180 @@ function construirPanelUbicacion() {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); ejecutarBusqueda(); }
   });
+}
+
+/* ---------- CÓDIGO QR (para linkear video u otro archivo) ---------- */
+function construirPanelQR() {
+  panelLateralContenido.innerHTML = "";
+
+  const info = document.createElement("p");
+  info.className = "panel-vacio";
+  info.style.textAlign = "left";
+  info.style.margin = "0 0 12px";
+  info.textContent = "Generá un código QR para que quien mire el libro pueda escanearlo con el celular y ver un video, una foto en Google Drive, o cualquier link.";
+  panelLateralContenido.appendChild(info);
+
+  const campo = document.createElement("div");
+  campo.className = "campo-busqueda";
+  const inputUrl = document.createElement("input");
+  inputUrl.type = "text";
+  inputUrl.placeholder = "https://...";
+  campo.appendChild(inputUrl);
+  panelLateralContenido.appendChild(campo);
+
+  const filaCasilla = document.createElement("label");
+  filaCasilla.className = "fila-casilla";
+  filaCasilla.style.marginBottom = "14px";
+  const chkTexto = document.createElement("input");
+  chkTexto.type = "checkbox";
+  chkTexto.checked = true;
+  filaCasilla.appendChild(chkTexto);
+  filaCasilla.appendChild(document.createTextNode('Agregar también un texto ("Escaneá para ver el video")'));
+  panelLateralContenido.appendChild(filaCasilla);
+
+  const btnAgregar = document.createElement("button");
+  btnAgregar.className = "boton boton-primario";
+  btnAgregar.style.width = "100%";
+  btnAgregar.style.justifyContent = "center";
+  btnAgregar.textContent = "🔳 Agregar código QR";
+  btnAgregar.addEventListener("click", async () => {
+    let url = inputUrl.value.trim();
+    if (!url) {
+      await abrirModal({ titulo: "Falta el link", mensaje: "Pegá primero la dirección del video o archivo.", textoOk: "Entendido", textoCancelar: "Cerrar" });
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    const hojaObj = hojaEnPosicion(posicion);
+    hojaObj.elementos.push({ tipo: "qr", url, x: 10, y: 10, w: 24, h: 24 });
+    if (chkTexto.checked) {
+      hojaObj.elementos.push({ tipo: "texto", x: 10, y: 35, w: 34, h: 8, fontSize: 2.8, texto: "📱 Escaneá para ver el video" });
+    }
+    guardarEstado();
+    render();
+    cerrarPanel();
+  });
+  panelLateralContenido.appendChild(btnAgregar);
+}
+
+/* ---------- TAMAÑO Y ORIENTACIÓN DEL LIBRO ---------- */
+/* Tamaños inspirados en Shutterfly, Mixbook y Blurb (los formatos más comunes de libros de fotos) */
+const TAMANOS_LIBRO = [
+  { id: "cuadrado-20", nombre: "Cuadrado chico", medida: "20×20 cm (8×8″)", anchoIn: 8, altoIn: 8 },
+  { id: "cuadrado-25", nombre: "Cuadrado mediano", medida: "25×25 cm (10×10″)", anchoIn: 10, altoIn: 10 },
+  { id: "cuadrado-30", nombre: "Cuadrado grande", medida: "30×30 cm (12×12″)", anchoIn: 12, altoIn: 12 },
+  { id: "retrato-8x10", nombre: "Retrato clásico", medida: "20×25 cm (8×10″)", anchoIn: 8, altoIn: 10 },
+  { id: "retrato-carta", nombre: "Retrato carta", medida: "21.5×28 cm (8.5×11″)", anchoIn: 8.5, altoIn: 11 }
+];
+
+function tamanoActual() {
+  return (estado.configuracion) || { anchoIn: 10, altoIn: 8 };
+}
+
+function aplicarTamanoLibro(anchoIn, altoIn) {
+  estado.configuracion = { anchoIn, altoIn };
+  guardarEstado();
+  render();
+}
+
+function construirPanelTamano() {
+  panelLateralContenido.innerHTML = "";
+  const conf = tamanoActual();
+  const esHorizontal = conf.anchoIn >= conf.altoIn;
+
+  const filaOrientacion = document.createElement("div");
+  filaOrientacion.className = "fila-orientacion";
+
+  const btnVertical = document.createElement("button");
+  btnVertical.className = "boton-orientacion" + (!esHorizontal ? " activo" : "");
+  btnVertical.innerHTML = '<span class="icono-orientacion" style="width:20px;height:26px;"></span><span>Vertical</span>';
+  btnVertical.addEventListener("click", () => {
+    const mayor = Math.max(conf.anchoIn, conf.altoIn);
+    const menor = Math.min(conf.anchoIn, conf.altoIn);
+    if (mayor === menor) return;
+    aplicarTamanoLibro(menor, mayor);
+    construirPanelTamano();
+  });
+  filaOrientacion.appendChild(btnVertical);
+
+  const btnHorizontal = document.createElement("button");
+  btnHorizontal.className = "boton-orientacion" + (esHorizontal ? " activo" : "");
+  btnHorizontal.innerHTML = '<span class="icono-orientacion" style="width:26px;height:20px;"></span><span>Horizontal</span>';
+  btnHorizontal.addEventListener("click", () => {
+    const mayor = Math.max(conf.anchoIn, conf.altoIn);
+    const menor = Math.min(conf.anchoIn, conf.altoIn);
+    if (mayor === menor) return;
+    aplicarTamanoLibro(mayor, menor);
+    construirPanelTamano();
+  });
+  filaOrientacion.appendChild(btnHorizontal);
+
+  panelLateralContenido.appendChild(filaOrientacion);
+
+  const rejilla = document.createElement("div");
+  rejilla.className = "rejilla-tamanos";
+  TAMANOS_LIBRO.forEach((t) => {
+    // Cada tamaño se aplica siempre con su orientación natural (ej: "Retrato" da vertical).
+    // Para verlo girado, elegilo y después usá el botón Horizontal/Vertical de arriba.
+    const activo = conf.anchoIn === t.anchoIn && conf.altoIn === t.altoIn;
+
+    const fila = document.createElement("button");
+    fila.className = "fila-tamano" + (activo ? " activo" : "");
+    const mini = document.createElement("span");
+    mini.className = "icono-tamano-mini";
+    const escala = 22 / Math.max(t.anchoIn, t.altoIn);
+    mini.style.width = (t.anchoIn * escala) + "px";
+    mini.style.height = (t.altoIn * escala) + "px";
+    fila.appendChild(mini);
+    const texto = document.createElement("span");
+    texto.textContent = `${t.nombre} — ${t.medida}`;
+    fila.appendChild(texto);
+    fila.addEventListener("click", () => {
+      aplicarTamanoLibro(t.anchoIn, t.altoIn);
+      construirPanelTamano();
+    });
+    rejilla.appendChild(fila);
+  });
+  panelLateralContenido.appendChild(rejilla);
+
+  const separador = document.createElement("div");
+  separador.className = "separador-panel";
+  panelLateralContenido.appendChild(separador);
+
+  const subtitulo = document.createElement("p");
+  subtitulo.className = "panel-vacio";
+  subtitulo.style.textAlign = "left";
+  subtitulo.style.margin = "0 0 10px";
+  subtitulo.textContent = "Tamaño personalizado (en centímetros):";
+  panelLateralContenido.appendChild(subtitulo);
+
+  const filaPersonalizada = document.createElement("div");
+  filaPersonalizada.className = "fila-personalizado";
+  const inputAncho = document.createElement("input");
+  inputAncho.type = "number"; inputAncho.min = "5"; inputAncho.step = "0.5";
+  inputAncho.value = (conf.anchoIn * 2.54).toFixed(1);
+  const porEl = document.createElement("span");
+  porEl.textContent = "×";
+  const inputAlto = document.createElement("input");
+  inputAlto.type = "number"; inputAlto.min = "5"; inputAlto.step = "0.5";
+  inputAlto.value = (conf.altoIn * 2.54).toFixed(1);
+  const cmEl = document.createElement("span");
+  cmEl.textContent = "cm";
+  const btnAplicar = document.createElement("button");
+  btnAplicar.className = "boton boton-chico";
+  btnAplicar.textContent = "Aplicar";
+  btnAplicar.addEventListener("click", () => {
+    const anchoCm = parseFloat(inputAncho.value);
+    const altoCm = parseFloat(inputAlto.value);
+    if (!anchoCm || !altoCm || anchoCm < 5 || altoCm < 5) return;
+    aplicarTamanoLibro(+(anchoCm / 2.54).toFixed(2), +(altoCm / 2.54).toFixed(2));
+    construirPanelTamano();
+  });
+  filaPersonalizada.appendChild(inputAncho);
+  filaPersonalizada.appendChild(porEl);
+  filaPersonalizada.appendChild(inputAlto);
+  filaPersonalizada.appendChild(cmEl);
+  filaPersonalizada.appendChild(btnAplicar);
+  panelLateralContenido.appendChild(filaPersonalizada);
 }
 
 /* ---------- PÁGINAS (tapa, contratapa y reordenar) ---------- */
@@ -1810,6 +2011,104 @@ document.getElementById("btnVistaPrevia").addEventListener("click", () => {
 document.getElementById("btnCerrarPreview").addEventListener("click", () => {
   overlayPreview.classList.add("oculto");
   iframePreview.srcdoc = "";
+});
+
+/* ==========================================================
+   EXPORTAR PARA IMPRIMIR (PDF listo para Blurb, Shutterfly, etc.)
+   Usa la función de "Imprimir" del navegador: al elegir
+   "Guardar como PDF" se genera un archivo con el tamaño real
+   del libro, sin depender de ninguna librería externa.
+   ========================================================== */
+function construirElementoHTMLEstatico(el) {
+  const estilo = `left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;
+  if (el.tipo === "foto") {
+    if (el.vacio || !el.src) return "";
+    const posicionFoto = `${el.posX ?? 50}% ${el.posY ?? 50}%`;
+    return `<div class="el-imp" style="${estilo}"><img src="${el.src}" style="width:100%;height:100%;object-fit:cover;object-position:${posicionFoto};display:block;"></div>`;
+  }
+  if (el.tipo === "mapa") {
+    return `<div class="el-imp" style="${estilo}"><img src="${construirURLMapa(el.lat, el.lon, el.estilo)}" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`;
+  }
+  if (el.tipo === "bandera") {
+    if (el.formato === "imagen") {
+      return `<div class="el-imp" style="${estilo}"><img src="https://flagcdn.com/w320/${el.codigoPais.toLowerCase()}.png" style="width:100%;height:100%;object-fit:contain;display:block;"></div>`;
+    }
+    return `<div class="el-imp" style="${estilo};display:flex;align-items:center;justify-content:center;font-size:20cqw;">${codigoPaisABandera(el.codigoPais)}</div>`;
+  }
+  if (el.tipo === "qr") {
+    return `<div class="el-imp" style="${estilo};background:#fff;"><img src="${construirURLQR(el.url)}" style="width:100%;height:100%;object-fit:contain;display:block;"></div>`;
+  }
+  // texto / titulo / subtitulo
+  const color = (el.tipo === "titulo" || el.tipo === "subtitulo") ? "#f5e9d8" : "#3b2a1a";
+  const peso = el.tipo === "titulo" ? "bold" : "normal";
+  const justif = MAPA_ALINEACION[el.alineacion || "centro"];
+  const alinTexto = el.alineacion === "izquierda" ? "left" : el.alineacion === "derecha" ? "right" : "center";
+  return `<div class="el-imp" style="${estilo};display:flex;align-items:center;justify-content:${justif};text-align:${alinTexto};font-family:${MAPA_FUENTES[el.fuente || "georgia"]};font-size:${el.fontSize}cqw;font-weight:${peso};color:${color};white-space:pre-wrap;overflow:hidden;">${escaparHTML(el.texto)}</div>`;
+}
+
+function generarHTMLParaImprimir() {
+  const conf = tamanoActual();
+  const todasLasHojas = [estado.tapa, ...estado.paginas, estado.contratapa];
+
+  const paginasHTML = todasLasHojas.map((hojaObj) => {
+    const elementosHTML = hojaObj.elementos.map(construirElementoHTMLEstatico).join("");
+    const fondoCSS = hojaObj.fondo.tipo === "foto"
+      ? `background-image:url('${hojaObj.fondo.valor}');background-size:cover;background-position:center;`
+      : `background-color:${hojaObj.fondo.valor};`;
+    return `<div class="pagina-imp" style="${fondoCSS}">${elementosHTML}</div>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Montserrat:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  @page { size: ${conf.anchoIn}in ${conf.altoIn}in; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ccc; }
+  .pagina-imp {
+    position: relative;
+    width: ${conf.anchoIn}in;
+    height: ${conf.altoIn}in;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+    container-type: inline-size;
+    margin: 0 auto 12px;
+    background: #fffdf8;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+  @media print {
+    .pagina-imp { margin: 0; box-shadow: none; }
+    html, body { background: #fff; }
+  }
+  .el-imp { position: absolute; }
+</style>
+</head>
+<body>${paginasHTML}</body>
+</html>
+`;
+}
+
+const overlayImprimir = document.getElementById("overlayImprimir");
+const iframeImprimir = document.getElementById("iframeImprimir");
+
+document.getElementById("btnExportarImprimir").addEventListener("click", () => {
+  iframeImprimir.srcdoc = generarHTMLParaImprimir();
+  overlayImprimir.classList.remove("oculto");
+});
+
+document.getElementById("btnCerrarImprimir").addEventListener("click", () => {
+  overlayImprimir.classList.add("oculto");
+  iframeImprimir.srcdoc = "";
+});
+
+document.getElementById("btnImprimirAhora").addEventListener("click", () => {
+  iframeImprimir.contentWindow.focus();
+  iframeImprimir.contentWindow.print();
 });
 
 /* ---------- ARRANQUE ---------- */

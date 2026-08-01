@@ -811,6 +811,18 @@ body {
   pointer-events: none;
 }
 
+.elemento.qr {
+  padding: 4px;
+  background: #ffffff;
+}
+
+.elemento.qr img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .elemento.bandera {
   padding: 0;
   display: flex;
@@ -911,6 +923,16 @@ body {
   padding: 12px 20px;
   background: var(--ink);
   color: #fff;
+}
+
+.ayuda-imprimir {
+  margin: 0;
+  padding: 10px 20px;
+  background: #fff8e6;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86em;
+  color: var(--ink);
+  text-align: center;
 }
 
 .iframe-preview {
@@ -1070,6 +1092,89 @@ body {
 .app.densidad-grande .panel-lateral { width: 340px; }
 .app.densidad-grande .icono-topbar { width: 42px; height: 42px; font-size: 1.35em; }
 .app.densidad-grande .boton { padding: 11px 20px; font-size: 1em; }
+
+/* --- TAMAÑO Y ORIENTACIÓN DEL LIBRO --- */
+.fila-orientacion {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.boton-orientacion {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-app);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.boton-orientacion.activo {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.icono-orientacion {
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.rejilla-tamanos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.fila-tamano {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--card);
+  text-align: left;
+  font-size: 0.86em;
+}
+
+.fila-tamano:hover {
+  border-color: var(--accent);
+}
+
+.fila-tamano.activo {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.icono-tamano-mini {
+  border: 1.5px solid var(--ink-soft);
+  flex-shrink: 0;
+}
+
+.fila-personalizado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fila-personalizado input {
+  width: 60px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.86em;
+}
 
 /* --- DISEÑOS PERSONALIZADOS --- */
 .fila-diseno-personalizado {
