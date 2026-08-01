@@ -49,6 +49,15 @@ function construirURLMapa(lat, lon, estilo) {
   return constructor(zoom, x, y);
 }
 
+const MAPA_FUENTES = {
+  georgia: "'Georgia', serif",
+  clasica: "'Times New Roman', serif",
+  moderna: "'Montserrat', 'Segoe UI', sans-serif",
+  maquina: "'Courier New', monospace",
+  titular: "'Playfair Display', Georgia, serif",
+  manuscrita: "'Caveat', cursive"
+};
+
 function codigoPaisABandera(codigoPais) {
   if (!codigoPais || codigoPais.length !== 2) return "🏳️";
   return String.fromCodePoint(...codigoPais.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
@@ -108,6 +117,7 @@ function pintar() {
       }
     } else {
       div.style.fontSize = el.fontSize + "cqw";
+      div.style.fontFamily = MAPA_FUENTES[el.fuente || "georgia"];
       div.textContent = el.texto;
     }
 

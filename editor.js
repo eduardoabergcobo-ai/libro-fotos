@@ -53,8 +53,6 @@ function migrarEstado(viejo) {
 
 /* ==========================================================
    VARIOS PROYECTOS (libros) EN EL MISMO NAVEGADOR
-   Cada proyecto se guarda con su propia clave; un "registro"
-   lleva la lista de proyectos y cuál está activo.
    ========================================================== */
 function prefijoProyecto(id) {
   return "libroFotosProyecto_" + id;
@@ -114,16 +112,71 @@ function inicializarProyectos() {
   return leerEstadoDeProyecto(registro.proyectoActivoId) || estadoPorDefecto();
 }
 
-function guardarEstado() {
+/* ---------- GUARDADO + HISTORIAL (deshacer / rehacer) ---------- */
+const LIMITE_HISTORIAL = 12;
+let pilaDeshacer = [];
+let pilaRehacer = [];
+
+function persistirActivo() {
   const registro = cargarRegistro();
   const id = registro.proyectoActivoId;
   if (id) {
-    localStorage.setItem(prefijoProyecto(id), JSON.stringify(estado));
+    localStorage.setItem(prefijoProyecto(id), ultimoEstadoTexto);
     const proyecto = registro.proyectos.find((p) => p.id === id);
     if (proyecto) proyecto.actualizado = Date.now();
     guardarRegistroDirecto(registro);
   }
   mostrarGuardado();
+}
+
+function guardarEstado() {
+  const nuevoTexto = JSON.stringify(estado);
+  if (nuevoTexto !== ultimoEstadoTexto) {
+    pilaDeshacer.push(ultimoEstadoTexto);
+    if (pilaDeshacer.length > LIMITE_HISTORIAL) pilaDeshacer.shift();
+    pilaRehacer = [];
+  }
+  ultimoEstadoTexto = nuevoTexto;
+  persistirActivo();
+  actualizarBotonesHistorial();
+}
+
+function reiniciarHistorial() {
+  pilaDeshacer = [];
+  pilaRehacer = [];
+  ultimoEstadoTexto = JSON.stringify(estado);
+  actualizarBotonesHistorial();
+}
+
+function deshacer() {
+  if (!pilaDeshacer.length) return;
+  pilaRehacer.push(ultimoEstadoTexto);
+  const anterior = pilaDeshacer.pop();
+  estado = JSON.parse(anterior);
+  ultimoEstadoTexto = anterior;
+  posicion = Math.max(0, Math.min(posicion, totalPosiciones() - 1));
+  persistirActivo();
+  render();
+  actualizarBotonesHistorial();
+}
+
+function rehacer() {
+  if (!pilaRehacer.length) return;
+  pilaDeshacer.push(ultimoEstadoTexto);
+  const siguiente = pilaRehacer.pop();
+  estado = JSON.parse(siguiente);
+  ultimoEstadoTexto = siguiente;
+  posicion = Math.max(0, Math.min(posicion, totalPosiciones() - 1));
+  persistirActivo();
+  render();
+  actualizarBotonesHistorial();
+}
+
+function actualizarBotonesHistorial() {
+  const btnD = document.getElementById("btnDeshacer");
+  const btnR = document.getElementById("btnRehacer");
+  if (btnD) btnD.disabled = pilaDeshacer.length === 0;
+  if (btnR) btnR.disabled = pilaRehacer.length === 0;
 }
 
 let temporizadorIndicadorGuardado;
@@ -140,6 +193,7 @@ function mostrarGuardado() {
 }
 
 let estado = inicializarProyectos();
+let ultimoEstadoTexto = JSON.stringify(estado);
 let posicion = 0; // 0 = tapa, último = contratapa, el resto son páginas
 
 /* ---------- POSICIÓN / NAVEGACIÓN ---------- */
@@ -160,14 +214,14 @@ function hojaEnPosicion(pos) {
 
 /* ---------- REFERENCIAS DOM ---------- */
 const hoja = document.getElementById("hoja");
+const hojaContenedor = document.getElementById("hojaContenedor");
 const indicadorPagina = document.getElementById("indicadorPagina");
 const btnPaginaPrev = document.getElementById("btnPaginaPrev");
 const btnPaginaNext = document.getElementById("btnPaginaNext");
 const btnPaginaBorrar = document.getElementById("btnPaginaBorrar");
-const panelFondo = document.getElementById("panelFondo");
-const panelDisenos = document.getElementById("panelDisenos");
-const panelPaginas = document.getElementById("panelPaginas");
-const panelProyectos = document.getElementById("panelProyectos");
+const panelLateral = document.getElementById("panelLateral");
+const panelLateralTitulo = document.getElementById("panelLateralTitulo");
+const panelLateralContenido = document.getElementById("panelLateralContenido");
 
 /* ---------- RENDER ---------- */
 function render() {
@@ -191,8 +245,14 @@ function render() {
   btnPaginaNext.disabled = posicion === totalPosiciones() - 1;
   btnPaginaBorrar.disabled = tipo !== "pagina";
 
-  if (!panelFondo.classList.contains("oculto")) construirPanelFondo();
-  if (!panelPaginas.classList.contains("oculto")) construirPanelPaginas();
+  if (panelActivo === "fondo") construirPanelFondo();
+  if (panelActivo === "paginas") construirPanelPaginas();
+
+  if (elementoTextoActivo && hojaObj.elementos.includes(elementoTextoActivo)) {
+    mostrarBarraFormato(elementoTextoActivo);
+  } else {
+    ocultarBarraFormatoSiCorresponde();
+  }
 }
 
 function aplicarFondo(elHoja, fondo) {
@@ -221,7 +281,7 @@ function crearElementoDOM(el, idx, hojaObj) {
       placeholder.innerHTML = "<span>📷</span><span>Tocá para subir foto</span>";
       wrapper.appendChild(placeholder);
       wrapper.addEventListener("click", (e) => {
-        if (e.target.closest(".handle-resize, .handle-borrar, .grip")) return;
+        if (e.target.closest(".handle-resize, .handle-borrar, .handle-duplicar, .grip")) return;
         subirFotoParaSlot(el, hojaObj);
       });
     } else {
@@ -232,7 +292,7 @@ function crearElementoDOM(el, idx, hojaObj) {
     }
     wrapper.addEventListener("pointerdown", (e) => {
       if (el.vacio) return;
-      if (e.target.closest(".handle-resize, .handle-borrar")) return;
+      if (e.target.closest(".handle-resize, .handle-borrar, .handle-duplicar")) return;
       iniciarArrastre(e, el, wrapper);
     });
   } else if (el.tipo === "mapa") {
@@ -246,7 +306,7 @@ function crearElementoDOM(el, idx, hojaObj) {
     pin.textContent = "📍";
     wrapper.appendChild(pin);
     wrapper.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".handle-resize, .handle-borrar, .handle-formato")) return;
+      if (e.target.closest(".handle-resize, .handle-borrar, .handle-formato, .handle-duplicar")) return;
       iniciarArrastre(e, el, wrapper);
     });
   } else if (el.tipo === "bandera") {
@@ -263,7 +323,7 @@ function crearElementoDOM(el, idx, hojaObj) {
       wrapper.appendChild(span);
     }
     wrapper.addEventListener("pointerdown", (e) => {
-      if (e.target.closest(".handle-resize, .handle-borrar, .handle-formato")) return;
+      if (e.target.closest(".handle-resize, .handle-borrar, .handle-formato, .handle-duplicar")) return;
       iniciarArrastre(e, el, wrapper);
     });
   } else {
@@ -272,8 +332,10 @@ function crearElementoDOM(el, idx, hojaObj) {
     contenido.contentEditable = "true";
     contenido.spellcheck = false;
     contenido.style.fontSize = el.fontSize + "cqw";
+    contenido.style.fontFamily = MAPA_FUENTES[el.fuente || "georgia"];
     contenido.textContent = el.texto;
     contenido.addEventListener("pointerdown", (e) => e.stopPropagation());
+    contenido.addEventListener("focus", () => mostrarBarraFormato(el));
     let temporizadorGuardado;
     contenido.addEventListener("input", () => {
       el.texto = contenido.textContent;
@@ -299,6 +361,7 @@ function crearElementoDOM(el, idx, hojaObj) {
     const handleBorrar = document.createElement("span");
     handleBorrar.className = "handle-borrar";
     handleBorrar.textContent = "×";
+    handleBorrar.title = "Borrar";
     handleBorrar.addEventListener("click", (e) => {
       e.stopPropagation();
       hojaObj.elementos.splice(idx, 1);
@@ -306,6 +369,21 @@ function crearElementoDOM(el, idx, hojaObj) {
       render();
     });
     wrapper.appendChild(handleBorrar);
+
+    const handleDuplicar = document.createElement("span");
+    handleDuplicar.className = "handle-duplicar";
+    handleDuplicar.textContent = "⧉";
+    handleDuplicar.title = "Duplicar";
+    handleDuplicar.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const copia = JSON.parse(JSON.stringify(el));
+      copia.x = clamp(el.x + 4, 0, 100 - el.w);
+      copia.y = clamp(el.y + 4, 0, 100 - el.h);
+      hojaObj.elementos.push(copia);
+      guardarEstado();
+      render();
+    });
+    wrapper.appendChild(handleDuplicar);
   }
 
   if (el.tipo === "mapa" || el.tipo === "bandera") {
@@ -389,6 +467,68 @@ function clamp(valor, min, max) {
 }
 
 /* ==========================================================
+   FORMATO DE TEXTO (tipografía y tamaño)
+   ========================================================== */
+const MAPA_FUENTES = {
+  georgia: "'Georgia', serif",
+  clasica: "'Times New Roman', serif",
+  moderna: "'Montserrat', 'Segoe UI', sans-serif",
+  maquina: "'Courier New', monospace",
+  titular: "'Playfair Display', Georgia, serif",
+  manuscrita: "'Caveat', cursive"
+};
+const OPCIONES_FUENTE = [
+  { id: "georgia", etiqueta: "Elegante (Georgia)" },
+  { id: "clasica", etiqueta: "Clásica (Times)" },
+  { id: "moderna", etiqueta: "Moderna (Montserrat)" },
+  { id: "maquina", etiqueta: "Máquina de escribir" },
+  { id: "titular", etiqueta: "Título (Playfair)" },
+  { id: "manuscrita", etiqueta: "Manuscrita (Caveat)" }
+];
+
+const barraFormato = document.getElementById("barraFormato");
+const selectFuente = document.getElementById("selectFuente");
+const indicadorTamano = document.getElementById("indicadorTamano");
+OPCIONES_FUENTE.forEach((f) => {
+  const opt = document.createElement("option");
+  opt.value = f.id;
+  opt.textContent = f.etiqueta;
+  selectFuente.appendChild(opt);
+});
+
+let elementoTextoActivo = null;
+
+function mostrarBarraFormato(el) {
+  elementoTextoActivo = el;
+  selectFuente.value = el.fuente || "georgia";
+  indicadorTamano.textContent = (el.fontSize || 5).toFixed(1).replace(/\.0$/, "");
+  barraFormato.classList.remove("oculto");
+}
+
+function ocultarBarraFormatoSiCorresponde() {
+  const hojaObj = hojaEnPosicion(posicion);
+  if (elementoTextoActivo && hojaObj.elementos.includes(elementoTextoActivo)) return;
+  elementoTextoActivo = null;
+  barraFormato.classList.add("oculto");
+}
+
+selectFuente.addEventListener("change", () => {
+  if (!elementoTextoActivo) return;
+  elementoTextoActivo.fuente = selectFuente.value;
+  guardarEstado();
+  render();
+});
+
+function cambiarTamanoTexto(delta) {
+  if (!elementoTextoActivo) return;
+  elementoTextoActivo.fontSize = clamp((elementoTextoActivo.fontSize || 5) + delta, 1.5, 16);
+  guardarEstado();
+  render();
+}
+document.getElementById("btnTamanoMas").addEventListener("click", () => cambiarTamanoTexto(0.5));
+document.getElementById("btnTamanoMenos").addEventListener("click", () => cambiarTamanoTexto(-0.5));
+
+/* ==========================================================
    VENTANA MODAL (reemplaza confirm()/alert() del navegador)
    ========================================================== */
 const modalOverlay = document.getElementById("modalOverlay");
@@ -407,8 +547,8 @@ function abrirModal({ titulo, mensaje, conInput = false, valorInicial = "", casi
     modalInput.classList.toggle("oculto", !conInput);
     modalOk.textContent = textoOk;
     modalCancelar.textContent = textoCancelar;
-    modalOk.classList.toggle("btn-peligro", peligro);
-    modalOk.classList.toggle("btn-primario", !peligro);
+    modalOk.classList.toggle("boton-peligro", peligro);
+    modalOk.classList.toggle("boton-primario", !peligro);
     modalOverlay.classList.remove("oculto");
     if (conInput) setTimeout(() => { modalInput.focus(); modalInput.select(); }, 50);
 
@@ -466,8 +606,6 @@ function abrirModal({ titulo, mensaje, conInput = false, valorInicial = "", casi
 
 /* ==========================================================
    SELECTOR DE ARCHIVOS COMPARTIDO
-   (un único <input type="file"> reutilizable, en vez de crear
-   uno nuevo cada vez — más confiable entre navegadores)
    ========================================================== */
 const inputAuxiliar = document.getElementById("inputAuxiliar");
 let callbackInputAuxiliar = null;
@@ -487,7 +625,7 @@ function pedirArchivoImagen(callback) {
 
 /* ---------- SUBIR FOTOS (libres) ---------- */
 const inputFoto = document.getElementById("inputFoto");
-document.getElementById("btnFoto").addEventListener("click", () => inputFoto.click());
+document.getElementById("railFoto").addEventListener("click", () => inputFoto.click());
 
 inputFoto.addEventListener("change", async (e) => {
   const archivos = Array.from(e.target.files);
@@ -533,8 +671,35 @@ function subirFotoParaSlot(el, hojaObj) {
 }
 
 /* ==========================================================
-   UBICACIÓN DE LA FOTO (leer GPS del EXIF + convertir a lugar)
+   MAPAS Y BANDERAS (helpers compartidos)
    ========================================================== */
+const ESTILOS_MAPA = {
+  estandar: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  topografico: (z, x, y) => `https://a.tile.opentopomap.org/${z}/${x}/${y}.png`,
+  ciclismo: (z, x, y) => `https://a.tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${x}/${y}.png`,
+  humanitario: (z, x, y) => `https://tile-a.openstreetmap.fr/hot/${z}/${x}/${y}.png`
+};
+const ESTILOS_MAPA_LISTA = Object.keys(ESTILOS_MAPA);
+const NOMBRES_ESTILOS_MAPA = {
+  estandar: "Estándar", topografico: "Topográfico", ciclismo: "Ilustrado", humanitario: "Humanitario"
+};
+
+function construirURLMapa(lat, lon, estilo) {
+  const zoom = 14;
+  const n = Math.pow(2, zoom);
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+  const constructor = ESTILOS_MAPA[estilo] || ESTILOS_MAPA.estandar;
+  return constructor(zoom, x, y);
+}
+
+function codigoPaisABandera(codigoPais) {
+  if (!codigoPais || codigoPais.length !== 2) return "🏳️";
+  return String.fromCodePoint(...codigoPais.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
+}
+
+/* ---------- UBICACIÓN AUTOMÁTICA (GPS del EXIF de la foto) ---------- */
 function leerGPSDeArrayBuffer(buffer) {
   try {
     const view = new DataView(buffer);
@@ -622,31 +787,6 @@ async function buscarLugarPorCoordenadas(lat, lon) {
   }
 }
 
-/* Varios estilos de mapa para elegir (todos gratuitos, sin necesidad de clave) */
-const ESTILOS_MAPA = {
-  estandar: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
-  topografico: (z, x, y) => `https://a.tile.opentopomap.org/${z}/${x}/${y}.png`,
-  ciclismo: (z, x, y) => `https://a.tile-cyclosm.openstreetmap.fr/cyclosm/${z}/${x}/${y}.png`,
-  humanitario: (z, x, y) => `https://tile-a.openstreetmap.fr/hot/${z}/${x}/${y}.png`
-};
-const ESTILOS_MAPA_LISTA = Object.keys(ESTILOS_MAPA);
-
-function construirURLMapa(lat, lon, estilo) {
-  const zoom = 14;
-  const n = Math.pow(2, zoom);
-  const x = Math.floor(((lon + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
-  const constructor = ESTILOS_MAPA[estilo] || ESTILOS_MAPA.estandar;
-  return constructor(zoom, x, y);
-}
-
-/* Convierte un código de país (ISO "AR") en el emoji de su bandera */
-function codigoPaisABandera(codigoPais) {
-  if (!codigoPais || codigoPais.length !== 2) return "🏳️";
-  return String.fromCodePoint(...codigoPais.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
-}
-
 async function sugerirUbicacionSiHay(archivo, elementoFoto, hojaObj) {
   if (!archivo || (archivo.type !== "image/jpeg" && archivo.type !== "image/jpg")) return;
   try {
@@ -656,7 +796,7 @@ async function sugerirUbicacionSiHay(archivo, elementoFoto, hojaObj) {
     const info = await buscarLugarPorCoordenadas(gps.lat, gps.lon);
     const respuesta = await abrirModal({
       titulo: "📍 Ubicación detectada",
-      mensaje: "Esta foto tiene datos de dónde fue tomada. Elegí qué querés agregar a la página (después podés cambiar el estilo del mapa o la bandera tocando 🔄):",
+      mensaje: "Esta foto tiene datos de dónde fue tomada. Elegí qué querés agregar (después podés cambiar el estilo tocando 🔄):",
       conInput: true,
       valorInicial: info.texto,
       casillas: [
@@ -668,45 +808,53 @@ async function sugerirUbicacionSiHay(archivo, elementoFoto, hojaObj) {
       textoCancelar: "No, gracias"
     });
     if (!respuesta) return;
-
-    let yBase = clamp(elementoFoto.y + elementoFoto.h + 2, 0, 88);
-
-    if (respuesta.marcas.texto) {
-      hojaObj.elementos.push({
-        tipo: "texto",
-        x: clamp(elementoFoto.x, 0, 70), y: yBase,
-        w: Math.max(elementoFoto.w, 30), h: 9, fontSize: 3.2,
-        texto: "📍 " + respuesta.texto
-      });
-      yBase = clamp(yBase + 10, 0, 78);
-    }
-
-    if (respuesta.marcas.mapa) {
-      hojaObj.elementos.push({
-        tipo: "mapa", estilo: "estandar",
-        x: clamp(elementoFoto.x, 0, 65), y: yBase,
-        w: Math.max(Math.min(elementoFoto.w, 40), 25), h: 20,
-        lat: gps.lat, lon: gps.lon
-      });
-      yBase = clamp(yBase + 22, 0, 78);
-    }
-
-    if (respuesta.marcas.bandera && info.countryCode) {
-      hojaObj.elementos.push({
-        tipo: "bandera", formato: "emoji", codigoPais: info.countryCode,
-        x: clamp(elementoFoto.x, 0, 85), y: yBase, w: 12, h: 12
-      });
-    }
-
-    if (respuesta.marcas.texto || respuesta.marcas.mapa || respuesta.marcas.bandera) {
-      guardarEstado();
-      render();
-    }
+    agregarElementosDeUbicacion(hojaObj, respuesta.texto, gps.lat, gps.lon, info.countryCode, {
+      texto: respuesta.marcas.texto, mapa: respuesta.marcas.mapa, bandera: respuesta.marcas.bandera
+    }, { x: elementoFoto.x, y: elementoFoto.y + elementoFoto.h + 2, w: elementoFoto.w });
   } catch (e) { /* si algo falla no interrumpimos al usuario */ }
 }
 
-/* ---------- AGREGAR TEXTO ---------- */
-document.getElementById("btnTexto").addEventListener("click", () => {
+/* Inserta texto / mapa / bandera de una ubicación dada, en cascada debajo de un punto de partida */
+function agregarElementosDeUbicacion(hojaObj, textoLugar, lat, lon, countryCode, cuales, base) {
+  let yBase = clamp(base.y, 0, 88);
+  const anchoBase = base.w || 40;
+  let algo = false;
+
+  if (cuales.texto) {
+    hojaObj.elementos.push({
+      tipo: "texto",
+      x: clamp(base.x, 0, 70), y: yBase,
+      w: Math.max(anchoBase, 30), h: 9, fontSize: 3.2,
+      texto: "📍 " + textoLugar
+    });
+    yBase = clamp(yBase + 10, 0, 78);
+    algo = true;
+  }
+  if (cuales.mapa) {
+    hojaObj.elementos.push({
+      tipo: "mapa", estilo: "estandar",
+      x: clamp(base.x, 0, 65), y: yBase,
+      w: Math.max(Math.min(anchoBase, 40), 25), h: 20,
+      lat, lon
+    });
+    yBase = clamp(yBase + 22, 0, 78);
+    algo = true;
+  }
+  if (cuales.bandera && countryCode) {
+    hojaObj.elementos.push({
+      tipo: "bandera", formato: "emoji", codigoPais: countryCode,
+      x: clamp(base.x, 0, 85), y: yBase, w: 12, h: 12
+    });
+    algo = true;
+  }
+  if (algo) {
+    guardarEstado();
+    render();
+  }
+}
+
+/* ---------- AGREGAR TEXTO (rail) ---------- */
+document.getElementById("railTexto").addEventListener("click", () => {
   hojaEnPosicion(posicion).elementos.push({
     tipo: "texto", x: 15, y: 15, w: 40, h: 20, fontSize: 5,
     texto: "Escribí acá tu texto"
@@ -715,12 +863,48 @@ document.getElementById("btnTexto").addEventListener("click", () => {
   render();
 });
 
-/* ---------- PANELES: abrir uno solo a la vez ---------- */
-function cerrarPaneles(excepto) {
-  [panelDisenos, panelFondo, panelPaginas, panelProyectos].forEach((p) => {
-    if (p !== excepto) p.classList.add("oculto");
+/* ==========================================================
+   PANEL LATERAL (uno solo, cambia de contenido según el rail)
+   ========================================================== */
+let panelActivo = null;
+
+function abrirPanel(nombre, titulo, construir) {
+  panelActivo = nombre;
+  panelLateralTitulo.textContent = titulo;
+  construir();
+  panelLateral.classList.remove("oculto");
+  actualizarRailActivo();
+}
+
+function cerrarPanel() {
+  panelActivo = null;
+  panelLateral.classList.add("oculto");
+  actualizarRailActivo();
+}
+
+function actualizarRailActivo() {
+  document.querySelectorAll(".rail-boton[data-panel]").forEach((b) => {
+    b.classList.toggle("activo", b.dataset.panel === panelActivo);
   });
 }
+
+const DEFINICIONES_PANEL = {
+  disenos: { titulo: "Diseños con varias fotos", construir: construirPanelDisenosUI },
+  fondo: { titulo: "Fondo de la página", construir: construirPanelFondo },
+  ubicacion: { titulo: "Mapa y bandera de un lugar", construir: construirPanelUbicacion },
+  paginas: { titulo: "Tapa, contratapa y páginas", construir: construirPanelPaginas }
+};
+
+document.querySelectorAll(".rail-boton[data-panel]").forEach((boton) => {
+  boton.addEventListener("click", () => {
+    const nombre = boton.dataset.panel;
+    if (panelActivo === nombre) { cerrarPanel(); return; }
+    const def = DEFINICIONES_PANEL[nombre];
+    abrirPanel(nombre, def.titulo, def.construir);
+  });
+});
+
+document.getElementById("btnCerrarPanel").addEventListener("click", cerrarPanel);
 
 /* ---------- DISEÑOS (varias fotos por página, estilo historias) ---------- */
 const DISENOS = [
@@ -733,8 +917,10 @@ const DISENOS = [
   { id: "lateral", celdas: [{ x: 2, y: 2, w: 63, h: 96 }, { x: 67, y: 2, w: 31, h: 31 }, { x: 67, y: 35, w: 31, h: 31 }, { x: 67, y: 68, w: 31, h: 30 }] }
 ];
 
-function construirPanelDisenos() {
-  panelDisenos.innerHTML = "";
+function construirPanelDisenosUI() {
+  panelLateralContenido.innerHTML = "";
+  const rejilla = document.createElement("div");
+  rejilla.className = "rejilla-disenos";
   DISENOS.forEach((d) => {
     const boton = document.createElement("button");
     boton.className = "miniatura-diseno";
@@ -752,10 +938,11 @@ function construirPanelDisenos() {
     boton.appendChild(caja);
     boton.addEventListener("click", () => {
       aplicarDiseno(d);
-      panelDisenos.classList.add("oculto");
+      cerrarPanel();
     });
-    panelDisenos.appendChild(boton);
+    rejilla.appendChild(boton);
   });
+  panelLateralContenido.appendChild(rejilla);
 }
 
 function aplicarDiseno(diseno) {
@@ -775,13 +962,6 @@ function aplicarDiseno(diseno) {
   render();
 }
 
-document.getElementById("btnDisenos").addEventListener("click", () => {
-  cerrarPaneles(panelDisenos);
-  const abrir = panelDisenos.classList.contains("oculto");
-  panelDisenos.classList.toggle("oculto");
-  if (abrir) construirPanelDisenos();
-});
-
 /* ---------- FONDO (color o foto) ---------- */
 const COLORES_FONDO = [
   "#2b1d14", "#fffdf8", "#1d2b3a", "#1d3a24", "#3a1d24",
@@ -789,7 +969,7 @@ const COLORES_FONDO = [
 ];
 
 function construirPanelFondo() {
-  panelFondo.innerHTML = "";
+  panelLateralContenido.innerHTML = "";
   const hojaObj = hojaEnPosicion(posicion);
 
   const fila = document.createElement("div");
@@ -807,13 +987,13 @@ function construirPanelFondo() {
     });
     fila.appendChild(sw);
   });
-  panelFondo.appendChild(fila);
+  panelLateralContenido.appendChild(fila);
 
   const filaAcciones = document.createElement("div");
   filaAcciones.className = "fila-acciones-fondo";
 
   const labelColor = document.createElement("label");
-  labelColor.className = "btn";
+  labelColor.className = "boton";
   labelColor.textContent = "🎨 Color personalizado";
   const inputColor = document.createElement("input");
   inputColor.type = "color";
@@ -828,7 +1008,7 @@ function construirPanelFondo() {
   filaAcciones.appendChild(labelColor);
 
   const btnFotoFondo = document.createElement("button");
-  btnFotoFondo.className = "btn";
+  btnFotoFondo.className = "boton";
   btnFotoFondo.textContent = "🖼 Usar una foto de fondo";
   btnFotoFondo.addEventListener("click", () => {
     pedirArchivoImagen(async (archivo) => {
@@ -842,7 +1022,7 @@ function construirPanelFondo() {
 
   if (hojaObj.fondo.tipo === "foto") {
     const btnQuitar = document.createElement("button");
-    btnQuitar.className = "btn btn-peligro";
+    btnQuitar.className = "boton boton-peligro";
     btnQuitar.textContent = "Quitar foto de fondo";
     btnQuitar.addEventListener("click", () => {
       hojaObj.fondo = { tipo: "color", valor: "#fffdf8" };
@@ -852,74 +1032,228 @@ function construirPanelFondo() {
     filaAcciones.appendChild(btnQuitar);
   }
 
-  panelFondo.appendChild(filaAcciones);
+  panelLateralContenido.appendChild(filaAcciones);
 }
 
-document.getElementById("btnFondo").addEventListener("click", () => {
-  cerrarPaneles(panelFondo);
-  const abrir = panelFondo.classList.contains("oculto");
-  panelFondo.classList.toggle("oculto");
-  if (abrir) construirPanelFondo();
-});
+/* ---------- UBICACIÓN MANUAL (buscar cualquier lugar) ---------- */
+async function buscarLugares(consulta) {
+  const resp = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(consulta)}&format=json&addressdetails=1&limit=5&accept-language=es`
+  );
+  if (!resp.ok) throw new Error("búsqueda falló");
+  return resp.json();
+}
 
-/* ---------- REORDENAR PÁGINAS ---------- */
-function construirPanelPaginas() {
-  panelPaginas.innerHTML = "";
+function construirPanelUbicacion() {
+  panelLateralContenido.innerHTML = "";
 
-  if (estado.paginas.length === 0) {
-    const vacio = document.createElement("p");
-    vacio.className = "panel-vacio";
-    vacio.textContent = "Todavía no hay páginas para reordenar (solo tapa y contratapa).";
-    panelPaginas.appendChild(vacio);
-    return;
+  const info = document.createElement("p");
+  info.className = "panel-vacio";
+  info.style.margin = "0 0 12px";
+  info.textContent = "Buscá cualquier lugar y agregá su nombre, un mini-mapa y/o su bandera a la página actual.";
+  panelLateralContenido.appendChild(info);
+
+  const campo = document.createElement("div");
+  campo.className = "campo-busqueda";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "Ej: Mar del Plata, Argentina";
+  const btnBuscar = document.createElement("button");
+  btnBuscar.className = "boton boton-primario";
+  btnBuscar.textContent = "Buscar";
+  campo.appendChild(input);
+  campo.appendChild(btnBuscar);
+  panelLateralContenido.appendChild(campo);
+
+  const resultados = document.createElement("div");
+  resultados.className = "resultados-busqueda";
+  panelLateralContenido.appendChild(resultados);
+
+  let lugarSeleccionado = null;
+
+  const zonaAgregar = document.createElement("div");
+  zonaAgregar.className = "oculto";
+  const casillasCont = document.createElement("div");
+  casillasCont.className = "modal-casillas";
+  ["texto", "mapa", "bandera"].forEach((id, i) => {
+    const etiquetas = {
+      texto: "Agregar el nombre del lugar como texto",
+      mapa: "Agregar un mini-mapa con la ubicación",
+      bandera: "Agregar la bandera del país"
+    };
+    const fila = document.createElement("label");
+    fila.className = "fila-casilla";
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.id = "ubicCasilla-" + id;
+    chk.checked = i === 0;
+    fila.appendChild(chk);
+    fila.appendChild(document.createTextNode(etiquetas[id]));
+    casillasCont.appendChild(fila);
+  });
+  zonaAgregar.appendChild(casillasCont);
+
+  const btnAgregar = document.createElement("button");
+  btnAgregar.className = "boton boton-primario";
+  btnAgregar.style.width = "100%";
+  btnAgregar.style.justifyContent = "center";
+  btnAgregar.textContent = "Agregar a la página";
+  btnAgregar.addEventListener("click", () => {
+    if (!lugarSeleccionado) return;
+    const hojaObj = hojaEnPosicion(posicion);
+    agregarElementosDeUbicacion(
+      hojaObj,
+      lugarSeleccionado.nombre,
+      lugarSeleccionado.lat,
+      lugarSeleccionado.lon,
+      lugarSeleccionado.countryCode,
+      {
+        texto: document.getElementById("ubicCasilla-texto").checked,
+        mapa: document.getElementById("ubicCasilla-mapa").checked,
+        bandera: document.getElementById("ubicCasilla-bandera").checked
+      },
+      { x: 10, y: 10, w: 40 }
+    );
+  });
+  zonaAgregar.appendChild(btnAgregar);
+  panelLateralContenido.appendChild(zonaAgregar);
+
+  async function ejecutarBusqueda() {
+    const consulta = input.value.trim();
+    if (!consulta) return;
+    resultados.innerHTML = '<p class="panel-vacio">Buscando...</p>';
+    zonaAgregar.classList.add("oculto");
+    lugarSeleccionado = null;
+    try {
+      const lugares = await buscarLugares(consulta);
+      resultados.innerHTML = "";
+      if (!lugares.length) {
+        resultados.innerHTML = '<p class="panel-vacio">No encontramos ese lugar. Probá con otro nombre.</p>';
+        return;
+      }
+      lugares.forEach((lugar) => {
+        const boton = document.createElement("button");
+        boton.className = "resultado-lugar";
+        boton.textContent = lugar.display_name;
+        boton.addEventListener("click", () => {
+          resultados.querySelectorAll(".resultado-lugar").forEach((b) => b.classList.remove("seleccionado"));
+          boton.classList.add("seleccionado");
+          lugarSeleccionado = {
+            nombre: lugar.display_name.split(",").slice(0, 2).join(","),
+            lat: parseFloat(lugar.lat),
+            lon: parseFloat(lugar.lon),
+            countryCode: lugar.address && lugar.address.country_code ? lugar.address.country_code.toUpperCase() : null
+          };
+          zonaAgregar.classList.remove("oculto");
+        });
+        resultados.appendChild(boton);
+      });
+    } catch (e) {
+      resultados.innerHTML = '<p class="panel-vacio">No se pudo buscar. Revisá tu conexión a internet.</p>';
+    }
   }
+
+  btnBuscar.addEventListener("click", ejecutarBusqueda);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); ejecutarBusqueda(); }
+  });
+}
+
+/* ---------- PÁGINAS (tapa, contratapa y reordenar) ---------- */
+function construirPanelPaginas() {
+  panelLateralContenido.innerHTML = "";
+
+  const filaTapa = document.createElement("div");
+  filaTapa.className = "fila-pagina-fija";
+  filaTapa.innerHTML = "<span>🎨</span>";
+  const infoTapa = document.createElement("span");
+  infoTapa.className = "info-pagina-fija";
+  infoTapa.textContent = "Tapa";
+  filaTapa.appendChild(infoTapa);
+  const btnIrTapa = document.createElement("button");
+  btnIrTapa.className = "boton";
+  btnIrTapa.textContent = posicion === 0 ? "Editando" : "Editar";
+  btnIrTapa.disabled = posicion === 0;
+  btnIrTapa.addEventListener("click", () => { posicion = 0; render(); });
+  filaTapa.appendChild(btnIrTapa);
+  panelLateralContenido.appendChild(filaTapa);
 
   const lista = document.createElement("div");
   lista.className = "lista-paginas";
 
-  estado.paginas.forEach((p, i) => {
-    const fila = document.createElement("div");
-    fila.className = "fila-pagina" + (posicion === i + 1 ? " activa" : "");
+  function botonInsertarAqui(indice, etiqueta) {
+    const btn = document.createElement("button");
+    btn.className = "boton-insertar-aqui";
+    btn.title = etiqueta;
+    btn.textContent = "＋ insertar página acá";
+    btn.addEventListener("click", () => insertarPaginaEnIndice(indice));
+    return btn;
+  }
 
-    const miniatura = document.createElement("div");
-    miniatura.className = "miniatura-pagina";
-    aplicarFondo(miniatura, p.fondo);
-    fila.appendChild(miniatura);
+  if (estado.paginas.length === 0) {
+    lista.appendChild(botonInsertarAqui(0, "Agregar la primera página"));
+  } else {
+    lista.appendChild(botonInsertarAqui(0, "Insertar página al principio"));
+    estado.paginas.forEach((p, i) => {
+      const fila = document.createElement("div");
+      fila.className = "fila-pagina" + (posicion === i + 1 ? " activa" : "");
 
-    const info = document.createElement("span");
-    info.className = "info-pagina";
-    info.textContent = `Página ${i + 1}`;
-    fila.appendChild(info);
+      const miniatura = document.createElement("div");
+      miniatura.className = "miniatura-pagina";
+      aplicarFondo(miniatura, p.fondo);
+      fila.appendChild(miniatura);
 
-    const btnSubir = document.createElement("button");
-    btnSubir.className = "btn btn-icono";
-    btnSubir.textContent = "▲";
-    btnSubir.title = "Mover antes";
-    btnSubir.disabled = i === 0;
-    btnSubir.addEventListener("click", () => moverPagina(i, i - 1));
-    fila.appendChild(btnSubir);
+      const infoEl = document.createElement("span");
+      infoEl.className = "info-pagina";
+      infoEl.textContent = `Página ${i + 1}`;
+      fila.appendChild(infoEl);
 
-    const btnBajar = document.createElement("button");
-    btnBajar.className = "btn btn-icono";
-    btnBajar.textContent = "▼";
-    btnBajar.title = "Mover después";
-    btnBajar.disabled = i === estado.paginas.length - 1;
-    btnBajar.addEventListener("click", () => moverPagina(i, i + 1));
-    fila.appendChild(btnBajar);
+      const btnSubir = document.createElement("button");
+      btnSubir.className = "boton boton-chico";
+      btnSubir.textContent = "▲";
+      btnSubir.title = "Mover antes";
+      btnSubir.disabled = i === 0;
+      btnSubir.addEventListener("click", () => moverPagina(i, i - 1));
+      fila.appendChild(btnSubir);
 
-    const btnIr = document.createElement("button");
-    btnIr.className = "btn";
-    btnIr.textContent = "Ir a esta página";
-    btnIr.addEventListener("click", () => {
-      posicion = i + 1;
-      render();
+      const btnBajar = document.createElement("button");
+      btnBajar.className = "boton boton-chico";
+      btnBajar.textContent = "▼";
+      btnBajar.title = "Mover después";
+      btnBajar.disabled = i === estado.paginas.length - 1;
+      btnBajar.addEventListener("click", () => moverPagina(i, i + 1));
+      fila.appendChild(btnBajar);
+
+      const btnIr = document.createElement("button");
+      btnIr.className = "boton boton-chico";
+      btnIr.textContent = posicion === i + 1 ? "Editando" : "Editar";
+      btnIr.disabled = posicion === i + 1;
+      btnIr.addEventListener("click", () => { posicion = i + 1; render(); });
+      fila.appendChild(btnIr);
+
+      lista.appendChild(fila);
+      lista.appendChild(botonInsertarAqui(i + 1, `Insertar página entre la ${i + 1} y la ${i + 2}`));
     });
-    fila.appendChild(btnIr);
+  }
 
-    lista.appendChild(fila);
-  });
+  panelLateralContenido.appendChild(lista);
 
-  panelPaginas.appendChild(lista);
+  const filaContratapa = document.createElement("div");
+  filaContratapa.className = "fila-pagina-fija";
+  filaContratapa.style.marginTop = "10px";
+  filaContratapa.innerHTML = "<span>🎨</span>";
+  const infoContratapa = document.createElement("span");
+  infoContratapa.className = "info-pagina-fija";
+  infoContratapa.textContent = "Contratapa";
+  filaContratapa.appendChild(infoContratapa);
+  const ultimaPos = totalPosiciones() - 1;
+  const btnIrContratapa = document.createElement("button");
+  btnIrContratapa.className = "boton";
+  btnIrContratapa.textContent = posicion === ultimaPos ? "Editando" : "Editar";
+  btnIrContratapa.disabled = posicion === ultimaPos;
+  btnIrContratapa.addEventListener("click", () => { posicion = ultimaPos; render(); });
+  filaContratapa.appendChild(btnIrContratapa);
+  panelLateralContenido.appendChild(filaContratapa);
 }
 
 function moverPagina(desde, hacia) {
@@ -933,26 +1267,24 @@ function moverPagina(desde, hacia) {
   render();
 }
 
-document.getElementById("btnReordenar").addEventListener("click", () => {
-  cerrarPaneles(panelPaginas);
-  const abrir = panelPaginas.classList.contains("oculto");
-  panelPaginas.classList.toggle("oculto");
-  if (abrir) construirPanelPaginas();
-});
+function insertarPaginaEnIndice(indice) {
+  estado.paginas.splice(indice, 0, hojaVacia());
+  posicion = indice + 1;
+  guardarEstado();
+  if (panelActivo === "paginas") construirPanelPaginas();
+  render();
+}
 
-/* ---------- PÁGINAS ---------- */
-document.getElementById("btnPaginaNueva").addEventListener("click", () => {
+function agregarPaginaNueva() {
   const tipo = tipoEnPosicion(posicion);
   let indiceInsercion;
   if (tipo === "tapa") indiceInsercion = 0;
   else if (tipo === "contratapa") indiceInsercion = estado.paginas.length;
   else indiceInsercion = posicion;
+  insertarPaginaEnIndice(indiceInsercion);
+}
 
-  estado.paginas.splice(indiceInsercion, 0, hojaVacia());
-  posicion = indiceInsercion + 1;
-  guardarEstado();
-  render();
-});
+document.getElementById("btnPaginaNueva").addEventListener("click", agregarPaginaNueva);
 
 btnPaginaBorrar.addEventListener("click", async () => {
   if (tipoEnPosicion(posicion) !== "pagina") return;
@@ -977,20 +1309,43 @@ btnPaginaNext.addEventListener("click", () => {
   if (posicion < totalPosiciones() - 1) { posicion++; render(); }
 });
 
-/* ---------- VACIAR TODO ---------- */
-document.getElementById("btnVaciar").addEventListener("click", async () => {
-  const confirmado = await abrirModal({
-    titulo: "Empezar de nuevo",
-    mensaje: "Esto borra todas las fotos y textos guardados en este navegador. Esta acción no se puede deshacer.",
-    textoOk: "Borrar todo",
-    textoCancelar: "Cancelar",
-    peligro: true
-  });
-  if (!confirmado) return;
-  estado = estadoPorDefecto();
-  posicion = 0;
-  guardarEstado();
-  render();
+/* ---------- ZOOM DEL LIENZO (solo visual, no cambia los datos) ---------- */
+let nivelZoom = 100;
+const indicadorZoom = document.getElementById("indicadorZoom");
+
+function aplicarZoom() {
+  hojaContenedor.style.transform = `scale(${nivelZoom / 100})`;
+  indicadorZoom.textContent = nivelZoom + "%";
+}
+document.getElementById("btnZoomMas").addEventListener("click", () => {
+  nivelZoom = Math.min(160, nivelZoom + 10);
+  aplicarZoom();
+});
+document.getElementById("btnZoomMenos").addEventListener("click", () => {
+  nivelZoom = Math.max(50, nivelZoom - 10);
+  aplicarZoom();
+});
+document.getElementById("btnZoomReset").addEventListener("click", () => {
+  nivelZoom = 100;
+  aplicarZoom();
+});
+
+/* ---------- DESHACER / REHACER ---------- */
+document.getElementById("btnDeshacer").addEventListener("click", deshacer);
+document.getElementById("btnRehacer").addEventListener("click", rehacer);
+
+function elementoActivoEsEditable() {
+  const ae = document.activeElement;
+  if (!ae) return false;
+  return ae.isContentEditable || ae.tagName === "INPUT" || ae.tagName === "TEXTAREA";
+}
+
+document.addEventListener("keydown", (e) => {
+  if (elementoActivoEsEditable()) return;
+  const combo = e.ctrlKey || e.metaKey;
+  if (!combo) return;
+  if (e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); deshacer(); }
+  else if (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey)) { e.preventDefault(); rehacer(); }
 });
 
 /* ---------- MIS PROYECTOS ---------- */
@@ -1010,10 +1365,12 @@ function actualizarNombreProyectoActivo() {
 
 function construirPanelProyectos() {
   const registro = cargarRegistro();
-  panelProyectos.innerHTML = "";
+  panelLateralContenido.innerHTML = "";
 
   const btnNuevo = document.createElement("button");
-  btnNuevo.className = "btn btn-primario";
+  btnNuevo.className = "boton boton-primario";
+  btnNuevo.style.width = "100%";
+  btnNuevo.style.justifyContent = "center";
   btnNuevo.textContent = "➕ Nuevo proyecto";
   btnNuevo.addEventListener("click", async () => {
     const nombre = await abrirModal({
@@ -1027,7 +1384,7 @@ function construirPanelProyectos() {
     const id = crearProyectoNuevo(nombre, estadoPorDefecto());
     cambiarProyecto(id);
   });
-  panelProyectos.appendChild(btnNuevo);
+  panelLateralContenido.appendChild(btnNuevo);
 
   const lista = document.createElement("div");
   lista.className = "lista-proyectos";
@@ -1055,14 +1412,14 @@ function construirPanelProyectos() {
       fila.appendChild(chip);
     } else {
       const btnAbrir = document.createElement("button");
-      btnAbrir.className = "btn";
+      btnAbrir.className = "boton boton-chico";
       btnAbrir.textContent = "Abrir";
       btnAbrir.addEventListener("click", () => cambiarProyecto(p.id));
       fila.appendChild(btnAbrir);
     }
 
     const btnRenombrar = document.createElement("button");
-    btnRenombrar.className = "btn btn-icono";
+    btnRenombrar.className = "boton boton-chico";
     btnRenombrar.textContent = "✏️";
     btnRenombrar.title = "Renombrar";
     btnRenombrar.addEventListener("click", async () => {
@@ -1083,7 +1440,7 @@ function construirPanelProyectos() {
     fila.appendChild(btnRenombrar);
 
     const btnEliminar = document.createElement("button");
-    btnEliminar.className = "btn btn-icono btn-peligro";
+    btnEliminar.className = "boton boton-chico boton-peligro";
     btnEliminar.textContent = "🗑";
     btnEliminar.title = "Eliminar proyecto";
     btnEliminar.addEventListener("click", async () => {
@@ -1101,7 +1458,7 @@ function construirPanelProyectos() {
     lista.appendChild(fila);
   });
 
-  panelProyectos.appendChild(lista);
+  panelLateralContenido.appendChild(lista);
 }
 
 function cambiarProyecto(id) {
@@ -1112,9 +1469,10 @@ function cambiarProyecto(id) {
   guardarRegistroDirecto(registro);
   estado = nuevoEstado;
   posicion = 0;
+  reiniciarHistorial();
   actualizarNombreProyectoActivo();
   render();
-  panelProyectos.classList.add("oculto");
+  cerrarPanel();
 }
 
 function eliminarProyecto(id) {
@@ -1135,16 +1493,18 @@ function eliminarProyecto(id) {
 
   estado = leerEstadoDeProyecto(registro.proyectoActivoId) || estadoPorDefecto();
   posicion = 0;
+  reiniciarHistorial();
   actualizarNombreProyectoActivo();
   construirPanelProyectos();
   render();
 }
 
 document.getElementById("btnProyectos").addEventListener("click", () => {
-  cerrarPaneles(panelProyectos);
-  const abrir = panelProyectos.classList.contains("oculto");
-  panelProyectos.classList.toggle("oculto");
-  if (abrir) construirPanelProyectos();
+  if (panelActivo === "proyectos") { cerrarPanel(); return; }
+  panelActivo = "proyectos";
+  panelLateralTitulo.textContent = "Mis proyectos";
+  construirPanelProyectos();
+  panelLateral.classList.remove("oculto");
 });
 
 /* ---------- EXPORTAR ---------- */
@@ -1159,6 +1519,9 @@ function generarHTMLExportado() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${tituloPagina}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Montserrat:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -1214,4 +1577,5 @@ document.getElementById("btnCerrarPreview").addEventListener("click", () => {
 
 /* ---------- ARRANQUE ---------- */
 actualizarNombreProyectoActivo();
+actualizarBotonesHistorial();
 render();

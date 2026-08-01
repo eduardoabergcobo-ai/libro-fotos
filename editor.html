@@ -4,88 +4,108 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Editor - Libro de Fotos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Montserrat:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="editor.css">
 </head>
 <body>
 
-  <header class="cabecera">
-    <div class="marca">
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-grupo">
       <span class="marca-icono">📖</span>
-      <span class="marca-texto">Editor de tu Libro de Fotos</span>
+      <button id="btnProyectos" class="boton-proyecto">
+        <span id="nombreProyectoActivo">Mi libro de fotos</span>
+        <span class="caret">▾</span>
+      </button>
     </div>
-    <div class="info-proyecto-activo">
-      <span id="nombreProyectoActivo" class="nombre-proyecto"></span>
-      <button id="btnProyectos" class="btn btn-header">📁 Mis proyectos</button>
+
+    <div class="topbar-grupo topbar-centro">
+      <button id="btnDeshacer" class="icono-topbar" title="Deshacer (Ctrl+Z)" disabled>↶</button>
+      <button id="btnRehacer" class="icono-topbar" title="Rehacer (Ctrl+Y)" disabled>↷</button>
       <span id="indicadorGuardado" class="indicador-guardado"></span>
+    </div>
+
+    <div class="topbar-grupo">
+      <button id="btnVistaPrevia" class="boton boton-fantasma">👁 Vista previa</button>
+      <button id="btnDescargar" class="boton boton-primario">⬇ Descargar</button>
     </div>
   </header>
 
-  <div class="barra">
-    <div class="grupo-barra">
-      <span class="etiqueta-grupo">Contenido</span>
-      <div class="botones-grupo">
-        <button id="btnFoto" class="btn">📷 Fotos</button>
-        <button id="btnTexto" class="btn">🔤 Texto</button>
-      </div>
-    </div>
+  <div class="cuerpo">
+    <nav class="rail">
+      <button class="rail-boton" id="railFoto" title="Agregar fotos">
+        <span class="rail-icono">📷</span><span class="rail-etiqueta">Fotos</span>
+      </button>
+      <button class="rail-boton" id="railTexto" title="Agregar texto">
+        <span class="rail-icono">🔤</span><span class="rail-etiqueta">Texto</span>
+      </button>
+      <button class="rail-boton" data-panel="disenos" title="Diseños con varias fotos">
+        <span class="rail-icono">▦</span><span class="rail-etiqueta">Diseños</span>
+      </button>
+      <button class="rail-boton" data-panel="fondo" title="Color o foto de fondo">
+        <span class="rail-icono">🎨</span><span class="rail-etiqueta">Fondo</span>
+      </button>
+      <button class="rail-boton" data-panel="ubicacion" title="Mapa y bandera de un lugar">
+        <span class="rail-icono">📍</span><span class="rail-etiqueta">Ubicación</span>
+      </button>
+      <button class="rail-boton" data-panel="paginas" title="Tapa, contratapa y páginas">
+        <span class="rail-icono">📑</span><span class="rail-etiqueta">Páginas</span>
+      </button>
+    </nav>
 
-    <div class="grupo-barra">
-      <span class="etiqueta-grupo">Diseño</span>
-      <div class="botones-grupo">
-        <button id="btnDisenos" class="btn">▦ Diseños</button>
-        <button id="btnFondo" class="btn">🎨 Fondo</button>
+    <aside id="panelLateral" class="panel-lateral oculto">
+      <div class="panel-lateral-cabecera">
+        <h3 id="panelLateralTitulo"></h3>
+        <button id="btnCerrarPanel" class="cerrar-panel">✕</button>
       </div>
-    </div>
+      <div id="panelLateralContenido" class="panel-lateral-contenido"></div>
+    </aside>
 
-    <div class="grupo-barra">
-      <span class="etiqueta-grupo">Navegar</span>
-      <div class="botones-grupo botones-navegar">
-        <button id="btnPaginaPrev" class="btn btn-icono">◀</button>
-        <span id="indicadorPagina" class="indicador"></span>
-        <button id="btnPaginaNext" class="btn btn-icono">▶</button>
+    <main class="zona-canvas">
+      <div class="barra-paginas">
+        <button id="btnPaginaPrev" class="icono-canvas">◀</button>
+        <span id="indicadorPagina" class="indicador-pagina"></span>
+        <button id="btnPaginaNext" class="icono-canvas">▶</button>
+        <span class="separador-vertical"></span>
+        <button id="btnPaginaNueva" class="boton boton-chico">＋ Página</button>
+        <button id="btnPaginaBorrar" class="boton boton-chico boton-peligro">🗑 Borrar</button>
       </div>
-    </div>
 
-    <div class="grupo-barra">
-      <span class="etiqueta-grupo">Páginas</span>
-      <div class="botones-grupo">
-        <button id="btnPaginaNueva" class="btn">＋ Nueva</button>
-        <button id="btnReordenar" class="btn">📑 Reordenar</button>
-        <button id="btnPaginaBorrar" class="btn btn-peligro">🗑 Borrar</button>
+      <div id="barraFormato" class="barra-formato oculto">
+        <select id="selectFuente" class="select-fuente"></select>
+        <span class="separador-vertical"></span>
+        <button id="btnTamanoMenos" class="icono-canvas">－</button>
+        <span id="indicadorTamano" class="indicador-zoom">5</span>
+        <button id="btnTamanoMas" class="icono-canvas">＋</button>
       </div>
-    </div>
 
-    <div class="grupo-barra grupo-final">
-      <span class="etiqueta-grupo">Libro</span>
-      <div class="botones-grupo">
-        <button id="btnVistaPrevia" class="btn">👁 Vista previa</button>
-        <button id="btnDescargar" class="btn btn-primario">⬇ Descargar</button>
-        <button id="btnVaciar" class="btn btn-peligro">🧹 Reiniciar</button>
+      <div class="envoltorio-hoja">
+        <div class="hoja-contenedor" id="hojaContenedor">
+          <div class="hoja" id="hoja"></div>
+        </div>
       </div>
-    </div>
+
+      <div class="controles-zoom">
+        <button id="btnZoomMenos" class="icono-canvas">－</button>
+        <span id="indicadorZoom" class="indicador-zoom">100%</span>
+        <button id="btnZoomMas" class="icono-canvas">＋</button>
+        <button id="btnZoomReset" class="icono-canvas" title="Restablecer zoom">⤾</button>
+      </div>
+    </main>
   </div>
-
-  <div id="panelDisenos" class="panel oculto"></div>
-  <div id="panelFondo" class="panel oculto"></div>
-  <div id="panelPaginas" class="panel oculto"></div>
-  <div id="panelProyectos" class="panel oculto"></div>
 
   <p class="ayuda">
-    La <strong>tapa</strong> y la <strong>contratapa</strong> son especiales: siempre son la primera y la última página, y también tienen fondo y elementos propios.
-    Arrastrá cada elemento desde <strong>⠿</strong>, cambiá su tamaño desde <strong>⤡</strong>, y borralo con <strong>×</strong>.
-    Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar"</strong>.
+    Arrastrá cada elemento desde <strong>⠿</strong>, cambiá su tamaño desde <strong>⤡</strong>, duplicalo con <strong>⧉</strong> y borralo con <strong>×</strong>.
+    Todo se guarda solo en este navegador — cuando termines, tocá <strong>"Descargar"</strong> y subilo a tu sitio.
   </p>
-
-  <div class="zona-hoja">
-    <div class="hoja-contenedor">
-      <div class="hoja" id="hoja"></div>
-    </div>
-  </div>
 
   <div id="overlayPreview" class="overlay-preview oculto">
     <div class="barra-preview">
       <span>👁 Vista previa de tu libro</span>
-      <button id="btnCerrarPreview" class="btn">✕ Cerrar</button>
+      <button id="btnCerrarPreview" class="boton boton-fantasma-oscuro">✕ Cerrar</button>
     </div>
     <iframe id="iframePreview" class="iframe-preview" title="Vista previa del libro"></iframe>
   </div>
@@ -97,14 +117,16 @@
       <input id="modalInput" class="modal-input oculto" type="text" spellcheck="false">
       <div id="modalCasillas" class="modal-casillas"></div>
       <div class="modal-botones">
-        <button id="modalCancelar" class="btn"></button>
-        <button id="modalOk" class="btn btn-primario"></button>
+        <button id="modalCancelar" class="boton"></button>
+        <button id="modalOk" class="boton boton-primario"></button>
       </div>
     </div>
   </div>
 
   <input type="file" id="inputFoto" accept="image/*" multiple hidden>
   <input type="file" id="inputAuxiliar" accept="image/*" hidden>
+
+</div>
 
 <script src="editor.js"></script>
 </body>
